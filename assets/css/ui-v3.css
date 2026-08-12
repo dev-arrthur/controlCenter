@@ -11,6 +11,11 @@
   gap:0!important;
 }
 
+/* Remove o bloco escuro intermediário da Home */
+body:has(.hero) section:has(.company-panel){
+  display:none!important;
+}
+
 /* Botão da área do cliente com preenchimento animado */
 .btn-client{
   position:relative!important;
