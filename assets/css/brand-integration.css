@@ -1,0 +1,86 @@
+/* Logos integradas ao layout, sem aparência de cards */
+
+.navbar-brand{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  border-radius:0!important;
+  padding:0!important;
+}
+
+.footer-logo-wrap{
+  display:inline-flex!important;
+  align-items:center;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  border-radius:0!important;
+  padding:0!important;
+}
+
+.footer-logo-wrap::before{
+  width:220px!important;
+  height:62px!important;
+  background-size:contain!important;
+}
+
+.client-logo-card{
+  flex:0 0 230px;
+  min-height:94px!important;
+  padding:10px 26px!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  transform:none!important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.client-logo-card:hover,
+.client-logo-card:focus-within{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+
+.client-logo-card img{
+  max-width:190px!important;
+  max-height:72px!important;
+  filter:grayscale(1);
+  opacity:.46;
+  transition:filter .32s ease,opacity .32s ease,transform .38s cubic-bezier(.16,1,.3,1)!important;
+}
+
+.client-logo-card:hover img,
+.client-logo-card:focus-within img{
+  filter:grayscale(0);
+  opacity:1;
+  transform:scale(1.08)!important;
+}
+
+.clients-track{
+  gap:34px!important;
+}
+
+@media(max-width:767.98px){
+  .footer-logo-wrap::before{
+    width:190px!important;
+    height:54px!important;
+  }
+
+  .client-logo-card{
+    flex-basis:175px;
+    min-height:82px!important;
+    padding:8px 18px!important;
+  }
+
+  .client-logo-card img{
+    max-width:150px!important;
+    max-height:58px!important;
+  }
+
+  .clients-track{gap:22px!important}
+}
