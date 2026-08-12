@@ -7,20 +7,21 @@ const CONTROL_CENTER = {
 const buildWhatsAppUrl = (message) =>
   `https://wa.me/${CONTROL_CENTER.whatsapp}?text=${encodeURIComponent(message)}`;
 
-const isHomePage = () => {
-  const path = window.location.pathname.replace(/\/+$/, "");
-  return path === "" || path.endsWith("/index.html") || path === "/index.html";
-};
+const prefersReducedMotion = () =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
 
-const loadHomeSectionsStyles = () => {
-  if (document.querySelector('link[data-home-sections-css]')) return;
+const loadStylesheet = (href, marker) => {
+  if (document.querySelector(`link[data-${marker}]`)) return;
 
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = "assets/css/home-sections.css";
-  link.dataset.homeSectionsCss = "true";
+  link.href = href;
+  link.setAttribute(`data-${marker}`, "true");
   document.head.appendChild(link);
 };
+
+const isHomePage = () =>
+  Boolean(document.querySelector(".hero") && document.querySelector("#planos"));
 
 const injectTrustedCompaniesSection = () => {
   if (document.querySelector("#clientes")) return;
@@ -64,7 +65,15 @@ const injectTrustedCompaniesSection = () => {
     </div>`;
 
   const companySection = document.querySelector(".company-panel")?.closest("section");
-  if (companySection) companySection.insertAdjacentElement("afterend", section);
+  const faqSection = document.querySelector(".faq")?.closest("section");
+
+  if (companySection) {
+    companySection.insertAdjacentElement("afterend", section);
+  } else if (faqSection) {
+    faqSection.insertAdjacentElement("beforebegin", section);
+  } else {
+    document.querySelector("main")?.appendChild(section);
+  }
 };
 
 const injectTechnologyNewsSection = () => {
@@ -77,7 +86,7 @@ const injectTechnologyNewsSection = () => {
       date: "23 jul 2026",
       icon: "bi-cpu",
       title: "AMD amplia a disputa por infraestrutura de IA com o sistema Helios",
-      excerpt: "O novo sistema em escala de rack mira grandes cargas de inteligência artificial e amplia a competição no mercado de data centers.",
+      excerpt: "O sistema em escala de rack mira grandes cargas de inteligência artificial e amplia a competição no mercado de data centers.",
       url: "https://techcrunch.com/2026/07/23/amd-takes-on-nvidia-with-its-helios-ai-rack-scale-system/"
     },
     {
@@ -141,7 +150,7 @@ const injectTechnologyNewsSection = () => {
         <p class="news-header-note mb-0">Notícias publicadas por veículos externos. Os links abrem a matéria original em uma nova aba.</p>
       </div>
       <div class="row g-4">${cards}</div>
-      <p class="news-source-note mb-0">Seleção editorial da Control Center • Conteúdo das matérias pertence aos respectivos veículos.</p>
+      <p class="news-source-note mb-0">Seleção editorial da Control Center. O conteúdo das matérias pertence aos respectivos veículos.</p>
     </div>`;
 
   const ctaSection = document.querySelector(".cta-panel")?.closest("section");
@@ -154,17 +163,175 @@ const injectTechnologyNewsSection = () => {
   }
 };
 
-const injectHomeSections = () => {
-  if (!isHomePage()) return;
-  loadHomeSectionsStyles();
-  injectTrustedCompaniesSection();
-  injectTechnologyNewsSection();
+const cleanDashCopy = () => {
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || parent.closest("script,style,noscript")) return NodeFilter.FILTER_REJECT;
+        return /[—–]/.test(node.nodeValue || "")
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT;
+      }
+    }
+  );
+
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+
+  nodes.forEach((node) => {
+    node.nodeValue = (node.nodeValue || "").replace(/\s*[—–]\s*/g, ", ");
+  });
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-  const navbar = document.querySelector(".navbar-cc");
+const setupScrollProgress = () => {
+  if (document.querySelector(".scroll-progress")) return;
 
-  injectHomeSections();
+  const progress = document.createElement("div");
+  progress.className = "scroll-progress";
+  progress.setAttribute("aria-hidden", "true");
+  progress.innerHTML = "<span></span>";
+  document.body.appendChild(progress);
+
+  const update = () => {
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const ratio = maxScroll > 0 ? Math.min(Math.max(window.scrollY / maxScroll, 0), 1) : 0;
+    progress.style.setProperty("--scroll-progress", ratio.toFixed(4));
+  };
+
+  update();
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update, { passive: true });
+};
+
+const setupRevealAnimations = () => {
+  const selector = [
+    ".reveal",
+    ".solution-card",
+    ".value-card",
+    ".team-card",
+    ".contact-card",
+    ".pain-card",
+    ".company-stat",
+    ".plan-row",
+    ".trust-item"
+  ].join(",");
+
+  const elements = [...document.querySelectorAll(selector)];
+  const variants = ["reveal-left", "reveal-right", "reveal-scale", ""];
+
+  elements.forEach((element, index) => {
+    element.classList.add("motion-item");
+
+    if (!element.classList.contains("reveal-left") &&
+        !element.classList.contains("reveal-right") &&
+        !element.classList.contains("reveal-scale")) {
+      const variant = variants[index % variants.length];
+      if (variant) element.classList.add(variant);
+    }
+
+    element.style.setProperty("--reveal-delay", `${Math.min((index % 5) * 70, 280)}ms`);
+  });
+
+  if (prefersReducedMotion() || !("IntersectionObserver" in window)) {
+    elements.forEach((element) => element.classList.add("is-visible"));
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.11, rootMargin: "0px 0px -6% 0px" }
+  );
+
+  elements.forEach((element) => observer.observe(element));
+};
+
+const setupSectionAnimations = () => {
+  const sections = [...document.querySelectorAll("main > section")];
+
+  if (prefersReducedMotion() || !("IntersectionObserver" in window)) {
+    sections.forEach((section) => section.classList.add("section-in-view"));
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) entry.target.classList.add("section-in-view");
+      });
+    },
+    { threshold: 0.18 }
+  );
+
+  sections.forEach((section) => observer.observe(section));
+};
+
+const setupHeroParallax = () => {
+  const hero = document.querySelector(".hero");
+  if (!hero || prefersReducedMotion()) return;
+
+  let ticking = false;
+
+  const update = () => {
+    const rect = hero.getBoundingClientRect();
+    const visible = rect.bottom > 0 && rect.top < window.innerHeight;
+
+    if (visible) {
+      const progress = Math.min(Math.max(-rect.top / Math.max(hero.offsetHeight, 1), 0), 1);
+      hero.style.setProperty("--hero-shift", `${progress * 34}px`);
+      hero.style.setProperty("--pixel-shift", `${progress * 18}px`);
+    }
+
+    ticking = false;
+  };
+
+  const requestUpdate = () => {
+    if (!ticking) {
+      window.requestAnimationFrame(update);
+      ticking = true;
+    }
+  };
+
+  update();
+  window.addEventListener("scroll", requestUpdate, { passive: true });
+  window.addEventListener("resize", requestUpdate, { passive: true });
+};
+
+const setupPointerTilt = () => {
+  if (prefersReducedMotion() || !window.matchMedia?.("(pointer:fine)")?.matches) return;
+
+  const surfaces = document.querySelectorAll(
+    ".solution-card,.news-card,.value-card,.team-card,.contact-card,.pain-card,.company-stat"
+  );
+
+  surfaces.forEach((surface) => {
+    surface.addEventListener("pointermove", (event) => {
+      const rect = surface.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width - 0.5;
+      const y = (event.clientY - rect.top) / rect.height - 0.5;
+      const rotateY = x * 4.5;
+      const rotateX = y * -4.5;
+
+      surface.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-5px)`;
+    });
+
+    surface.addEventListener("pointerleave", () => {
+      surface.style.transform = "";
+    });
+  });
+};
+
+const setupNavbar = () => {
+  const navbar = document.querySelector(".navbar-cc");
 
   const updateNavbar = () => {
     if (navbar) navbar.classList.toggle("is-scrolled", window.scrollY > 12);
@@ -173,6 +340,17 @@ document.addEventListener("DOMContentLoaded", () => {
   updateNavbar();
   window.addEventListener("scroll", updateNavbar, { passive: true });
 
+  const navCollapse = document.querySelector("#mainNav");
+  document.querySelectorAll("#mainNav .nav-link").forEach((link) => {
+    link.addEventListener("click", () => {
+      if (window.innerWidth < 992 && navCollapse?.classList.contains("show") && window.bootstrap) {
+        bootstrap.Collapse.getOrCreateInstance(navCollapse).hide();
+      }
+    });
+  });
+};
+
+const setupLinks = () => {
   document.querySelectorAll("[data-client-area]").forEach((link) => {
     link.href = CONTROL_CENTER.clientAreaUrl;
   });
@@ -181,57 +359,52 @@ document.addEventListener("DOMContentLoaded", () => {
     const message = link.dataset.whatsappMessage || "Olá! Vim pelo site da Control Center.";
     link.href = buildWhatsAppUrl(message);
   });
+};
 
+const setupContactForm = () => {
   const contactForm = document.querySelector("#contactForm");
+  if (!contactForm) return;
 
-  if (contactForm) {
-    contactForm.addEventListener("submit", (event) => {
-      event.preventDefault();
+  contactForm.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-      if (!contactForm.checkValidity()) {
-        contactForm.classList.add("was-validated");
-        return;
-      }
+    if (!contactForm.checkValidity()) {
+      contactForm.classList.add("was-validated");
+      return;
+    }
 
-      const data = new FormData(contactForm);
-      const message = [
-        "Olá! Vim pelo site da Control Center e gostaria de solicitar um orçamento.",
-        "",
-        `Nome: ${data.get("nome") || ""}`,
-        `Empresa: ${data.get("empresa") || ""}`,
-        `WhatsApp: ${data.get("telefone") || ""}`,
-        `Computadores: ${data.get("computadores") || "Não informado"}`,
-        `Assunto: ${data.get("assunto") || ""}`,
-        `Mensagem: ${data.get("mensagem") || "Não informada"}`
-      ].join("\n");
+    const data = new FormData(contactForm);
+    const message = [
+      "Olá! Vim pelo site da Control Center e gostaria de solicitar um orçamento.",
+      "",
+      `Nome: ${data.get("nome") || ""}`,
+      `Empresa: ${data.get("empresa") || ""}`,
+      `WhatsApp: ${data.get("telefone") || ""}`,
+      `Computadores: ${data.get("computadores") || "Não informado"}`,
+      `Assunto: ${data.get("assunto") || ""}`,
+      `Mensagem: ${data.get("mensagem") || "Não informada"}`
+    ].join("\n");
 
-      window.open(buildWhatsAppUrl(message), "_blank", "noopener,noreferrer");
-    });
-  }
-
-  const revealElements = document.querySelectorAll(".reveal");
-
-  if ("IntersectionObserver" in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.12 });
-
-    revealElements.forEach((element) => observer.observe(element));
-  } else {
-    revealElements.forEach((element) => element.classList.add("is-visible"));
-  }
-
-  const navCollapse = document.querySelector("#mainNav");
-  document.querySelectorAll("#mainNav .nav-link").forEach((link) => {
-    link.addEventListener("click", () => {
-      if (window.innerWidth < 992 && navCollapse?.classList.contains("show")) {
-        bootstrap.Collapse.getOrCreateInstance(navCollapse).hide();
-      }
-    });
+    window.open(buildWhatsAppUrl(message), "_blank", "noopener,noreferrer");
   });
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadStylesheet("assets/css/theme-v2.css", "theme-v2-css");
+
+  if (isHomePage()) {
+    loadStylesheet("assets/css/home-sections.css", "home-sections-css");
+    injectTrustedCompaniesSection();
+    injectTechnologyNewsSection();
+  }
+
+  cleanDashCopy();
+  setupLinks();
+  setupContactForm();
+  setupNavbar();
+  setupScrollProgress();
+  setupRevealAnimations();
+  setupSectionAnimations();
+  setupHeroParallax();
+  setupPointerTilt();
 });
