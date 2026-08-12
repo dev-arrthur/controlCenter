@@ -1,6 +1,5 @@
 const CONTROL_CENTER = {
   whatsapp: "5532984683427",
-  // Atualize quando o domínio definitivo da área do cliente for informado.
   clientAreaUrl: "https://SEU-OUTRO-DOMINIO-AQUI.com.br/"
 };
 
@@ -12,7 +11,6 @@ const prefersReducedMotion = () =>
 
 const loadStylesheet = (href, marker) => {
   if (document.querySelector(`link[data-${marker}]`)) return;
-
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = href;
@@ -35,18 +33,16 @@ const injectTrustedCompaniesSection = () => {
     { name: "Top Fitness", image: "assets/images/clients/top-fitness.webp" }
   ];
 
-  const logos = [...clients, ...clients]
-    .map((client, index) => {
-      const duplicate = index >= clients.length;
-      const alt = duplicate ? "" : `Logo ${client.name}`;
-      const hidden = duplicate ? ' aria-hidden="true"' : "";
+  const logos = [...clients, ...clients].map((client, index) => {
+    const duplicate = index >= clients.length;
+    const alt = duplicate ? "" : `Logo ${client.name}`;
+    const hidden = duplicate ? ' aria-hidden="true"' : "";
 
-      return `
-        <div class="client-logo-card"${hidden}>
-          <img src="${client.image}" alt="${alt}" loading="lazy" decoding="async" width="180" height="70">
-        </div>`;
-    })
-    .join("");
+    return `
+      <div class="client-logo-card"${hidden}>
+        <img src="${client.image}" alt="${alt}" loading="lazy" decoding="async" width="190" height="72">
+      </div>`;
+  }).join("");
 
   const section = document.createElement("section");
   section.id = "clientes";
@@ -55,9 +51,9 @@ const injectTrustedCompaniesSection = () => {
   section.innerHTML = `
     <div class="container">
       <div class="clients-heading reveal">
-        <span class="eyebrow">Confiança construída no dia a dia</span>
+        <span class="eyebrow">Clientes Control Center</span>
         <h2 class="section-title" id="clients-title">Empresas que confiam em nosso trabalho</h2>
-        <p class="section-lead">Tecnologia, suporte e infraestrutura acompanhando operações que precisam continuar funcionando.</p>
+        <p class="section-lead">Atendemos empresas de diferentes segmentos com suporte, infraestrutura e acompanhamento técnico para manter a operação funcionando.</p>
       </div>
     </div>
     <div class="clients-marquee reveal" role="region" aria-label="Empresas atendidas pela Control Center">
@@ -67,13 +63,9 @@ const injectTrustedCompaniesSection = () => {
   const companySection = document.querySelector(".company-panel")?.closest("section");
   const faqSection = document.querySelector(".faq")?.closest("section");
 
-  if (companySection) {
-    companySection.insertAdjacentElement("afterend", section);
-  } else if (faqSection) {
-    faqSection.insertAdjacentElement("beforebegin", section);
-  } else {
-    document.querySelector("main")?.appendChild(section);
-  }
+  if (companySection) companySection.insertAdjacentElement("afterend", section);
+  else if (faqSection) faqSection.insertAdjacentElement("beforebegin", section);
+  else document.querySelector("main")?.appendChild(section);
 };
 
 const injectTechnologyNewsSection = () => {
@@ -81,12 +73,12 @@ const injectTechnologyNewsSection = () => {
 
   const news = [
     {
-      category: "Infraestrutura & IA",
+      category: "Infraestrutura e IA",
       source: "TechCrunch",
       date: "23 jul 2026",
       icon: "bi-cpu",
       title: "AMD amplia a disputa por infraestrutura de IA com o sistema Helios",
-      excerpt: "O sistema em escala de rack mira grandes cargas de inteligência artificial e amplia a competição no mercado de data centers.",
+      excerpt: "O sistema em escala de rack foi criado para grandes cargas de inteligência artificial e aumenta a competição no mercado de data centers.",
       url: "https://techcrunch.com/2026/07/23/amd-takes-on-nvidia-with-its-helios-ai-rack-scale-system/"
     },
     {
@@ -94,7 +86,7 @@ const injectTechnologyNewsSection = () => {
       source: "Reuters",
       date: "07 ago 2026",
       icon: "bi-shield-lock",
-      title: "Novos modelos de IA elevam a atenção sobre riscos de cibersegurança",
+      title: "Novos modelos de IA aumentam a atenção sobre riscos de cibersegurança",
       excerpt: "O avanço das capacidades autônomas de IA está levando empresas de tecnologia a reforçar controles e protocolos de segurança.",
       url: "https://www.reuters.com/legal/litigation/openai-flags-possible-critical-cybersecurity-risk-upcoming-model-tightens-2026-08-07/"
     },
@@ -103,37 +95,33 @@ const injectTechnologyNewsSection = () => {
       source: "TechCrunch",
       date: "23 jul 2026",
       icon: "bi-soundwave",
-      title: "Claude ganha modo de voz com modelos mais capazes e integração com ferramentas",
+      title: "Claude recebe um modo de voz mais completo e integrado a ferramentas",
       excerpt: "A Anthropic ampliou o modo de voz do Claude para conversas mais complexas e conexão com aplicativos usados no trabalho.",
       url: "https://techcrunch.com/2026/07/23/anthropic-updates-claude-voice-mode-with-more-capable-models/"
     }
   ];
 
-  const cards = news
-    .map(
-      (item) => `
-        <div class="col-lg-4 reveal">
-          <article class="news-card">
-            <div class="news-card-top" aria-hidden="true">
-              <div class="news-card-icon"><i class="bi ${item.icon}"></i></div>
-            </div>
-            <div class="news-card-body">
-              <div class="news-meta">
-                <span class="news-category">${item.category}</span>
-                <span>${item.source}</span>
-                <span aria-hidden="true">•</span>
-                <time>${item.date}</time>
-              </div>
-              <h3>${item.title}</h3>
-              <p>${item.excerpt}</p>
-              <a class="news-link" href="${item.url}" target="_blank" rel="noopener noreferrer" aria-label="Ler notícia em ${item.source}: ${item.title}">
-                Ler notícia <i class="bi bi-arrow-up-right"></i>
-              </a>
-            </div>
-          </article>
-        </div>`
-    )
-    .join("");
+  const cards = news.map((item) => `
+    <div class="col-lg-4 reveal">
+      <article class="news-card">
+        <div class="news-card-top" aria-hidden="true">
+          <div class="news-card-icon"><i class="bi ${item.icon}"></i></div>
+        </div>
+        <div class="news-card-body">
+          <div class="news-meta">
+            <span class="news-category">${item.category}</span>
+            <span>${item.source}</span>
+            <span aria-hidden="true">•</span>
+            <time>${item.date}</time>
+          </div>
+          <h3>${item.title}</h3>
+          <p>${item.excerpt}</p>
+          <a class="news-link" href="${item.url}" target="_blank" rel="noopener noreferrer">
+            Ler notícia <i class="bi bi-arrow-up-right"></i>
+          </a>
+        </div>
+      </article>
+    </div>`).join("");
 
   const section = document.createElement("section");
   section.id = "noticias";
@@ -144,51 +132,77 @@ const injectTechnologyNewsSection = () => {
       <div class="news-header reveal">
         <div class="news-header-copy">
           <span class="eyebrow">Radar de tecnologia</span>
-          <h2 class="section-title mb-3" id="news-title">O que está movimentando o mundo da tecnologia</h2>
-          <p class="section-lead mb-0">Uma seleção de assuntos recentes sobre infraestrutura, inteligência artificial e segurança digital.</p>
+          <h2 class="section-title mb-3" id="news-title">O que está acontecendo no mundo da tecnologia</h2>
+          <p class="section-lead mb-0">Notícias e tendências para acompanhar mudanças em infraestrutura, segurança e inteligência artificial.</p>
         </div>
-        <p class="news-header-note mb-0">Notícias publicadas por veículos externos. Os links abrem a matéria original em uma nova aba.</p>
+        <p class="news-header-note mb-0">As matérias são de veículos externos e abrem em uma nova aba.</p>
       </div>
       <div class="row g-4">${cards}</div>
-      <p class="news-source-note mb-0">Seleção editorial da Control Center. O conteúdo das matérias pertence aos respectivos veículos.</p>
+      <p class="news-source-note mb-0">Seleção da Control Center. O conteúdo das matérias pertence aos respectivos veículos.</p>
     </div>`;
 
   const ctaSection = document.querySelector(".cta-panel")?.closest("section");
   const main = document.querySelector("main");
-
-  if (ctaSection) {
-    ctaSection.insertAdjacentElement("afterend", section);
-  } else if (main) {
-    main.appendChild(section);
-  }
+  if (ctaSection) ctaSection.insertAdjacentElement("afterend", section);
+  else main?.appendChild(section);
 };
 
-const cleanDashCopy = () => {
-  const walker = document.createTreeWalker(
-    document.body,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        const parent = node.parentElement;
-        if (!parent || parent.closest("script,style,noscript")) return NodeFilter.FILTER_REJECT;
-        return /[—–]/.test(node.nodeValue || "")
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_REJECT;
-      }
+const COPY_REPLACEMENTS = new Map([
+  ["Menos improviso, mais previsibilidade", "Acompanhamento preventivo para reduzir falhas"],
+  ["Compare o Plano Remoto e o Plano Padrão. O orçamento é personalizado conforme a estrutura, quantidade de usuários e necessidades da empresa.", "Veja o que cada plano inclui e escolha o atendimento que faz sentido para a rotina da sua empresa. O orçamento é definido de acordo com a estrutura e o número de usuários."],
+  ["Um único parceiro para os principais pontos da sua TI.", "Sua TI cuidada em um só lugar."],
+  ["A estrutura é pensada para apoiar a operação da empresa, do computador do usuário até rede, segurança, backup e servidores.", "Cuidamos dos pontos que mais afetam a rotina da empresa, incluindo computadores, rede, segurança, backup e servidores."],
+  ["Tecnologia deve sustentar o negócio — não interrompê-lo.", "Tecnologia para manter sua empresa funcionando todos os dias."],
+  ["A proposta é substituir improvisos por uma infraestrutura mais organizada, com suporte quando a equipe precisa e ações preventivas para reduzir interrupções.", "Organizamos a infraestrutura, acompanhamos o ambiente e atendemos sua equipe quando ela precisa. O foco é reduzir paradas e facilitar o dia a dia."],
+  ["Antes de solicitar uma proposta.", "Dúvidas comuns antes de contratar."],
+  ["Algumas respostas rápidas sobre atendimento e contratação.", "Veja como funciona o atendimento, os planos e a solicitação de orçamento."],
+  ["Descubra onde a sua infraestrutura pode melhorar.", "Quer melhorar a TI da sua empresa?"],
+  ["Converse com a Control Center e explique como sua empresa trabalha hoje. A partir disso, podemos direcionar o diagnóstico e o tipo de suporte mais adequado.", "Conte como sua empresa trabalha hoje e quais problemas mais atrapalham a rotina. Nossa equipe avalia o cenário e indica o atendimento mais adequado."],
+  ["Tecnologia organizada para sustentar o crescimento da sua empresa.", "Tecnologia organizada para acompanhar o crescimento da sua empresa."],
+  ["TI precisa funcionar como parte do negócio.", "A tecnologia precisa acompanhar a rotina da sua empresa."],
+  ["Nosso trabalho é organizar esse ambiente, prestar suporte aos usuários e acompanhar os pontos críticos da infraestrutura para reduzir improvisos e interrupções.", "Organizamos o ambiente, atendemos os usuários e acompanhamos os pontos críticos da infraestrutura para reduzir falhas e evitar paradas desnecessárias."],
+  ["Menos improviso. Mais previsibilidade.", "Uma rotina de TI mais organizada e previsível."],
+  ["Infraestrutura de TI pensada para a rotina da sua empresa.", "Soluções de TI para o que sua empresa precisa no dia a dia."],
+  ["A solução deve acompanhar o cenário real da empresa.", "Cada empresa precisa de uma solução compatível com sua rotina."],
+  ["Profissionais próximos da operação e das necessidades da sua empresa.", "Uma equipe próxima para cuidar da tecnologia da sua empresa."],
+  ["Tecnologia complexa. Comunicação simples.", "Tecnologia explicada de forma simples."],
+  ["Vamos entender o que sua empresa precisa melhorar em TI.", "Conte o que sua empresa precisa resolver em TI."],
+  ["Ajude-nos a entender seu cenário.", "Conte um pouco sobre sua empresa."]
+]);
+
+const polishSiteCopy = () => {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest("script,style,noscript")) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     }
-  );
+  });
 
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
 
   nodes.forEach((node) => {
-    node.nodeValue = (node.nodeValue || "").replace(/\s*[—–]\s*/g, ", ");
+    let value = node.nodeValue || "";
+    const trimmed = value.trim();
+
+    if (COPY_REPLACEMENTS.has(trimmed)) {
+      const replacement = COPY_REPLACEMENTS.get(trimmed);
+      value = value.replace(trimmed, replacement);
+    }
+
+    value = value
+      .replace(/\s*[—–]\s*/g, ", ")
+      .replace(/-{3,}/g, "")
+      .replace(/\s+,/g, ",")
+      .replace(/,\s*,/g, ",");
+
+    node.nodeValue = value;
   });
 };
 
 const setupScrollProgress = () => {
   if (document.querySelector(".scroll-progress")) return;
-
   const progress = document.createElement("div");
   progress.className = "scroll-progress";
   progress.setAttribute("aria-hidden", "true");
@@ -224,14 +238,10 @@ const setupRevealAnimations = () => {
 
   elements.forEach((element, index) => {
     element.classList.add("motion-item");
-
-    if (!element.classList.contains("reveal-left") &&
-        !element.classList.contains("reveal-right") &&
-        !element.classList.contains("reveal-scale")) {
+    if (!["reveal-left", "reveal-right", "reveal-scale"].some((name) => element.classList.contains(name))) {
       const variant = variants[index % variants.length];
       if (variant) element.classList.add(variant);
     }
-
     element.style.setProperty("--reveal-delay", `${Math.min((index % 5) * 70, 280)}ms`);
   });
 
@@ -240,37 +250,30 @@ const setupRevealAnimations = () => {
     return;
   }
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.11, rootMargin: "0px 0px -6% 0px" }
-  );
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.11, rootMargin: "0px 0px -6% 0px" });
 
   elements.forEach((element) => observer.observe(element));
 };
 
 const setupSectionAnimations = () => {
   const sections = [...document.querySelectorAll("main > section")];
-
   if (prefersReducedMotion() || !("IntersectionObserver" in window)) {
     sections.forEach((section) => section.classList.add("section-in-view"));
     return;
   }
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) entry.target.classList.add("section-in-view");
-      });
-    },
-    { threshold: 0.18 }
-  );
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) entry.target.classList.add("section-in-view");
+    });
+  }, { threshold: 0.18 });
 
   sections.forEach((section) => observer.observe(section));
 };
@@ -278,25 +281,21 @@ const setupSectionAnimations = () => {
 const setupHeroParallax = () => {
   const hero = document.querySelector(".hero");
   if (!hero || prefersReducedMotion()) return;
-
   let ticking = false;
 
   const update = () => {
     const rect = hero.getBoundingClientRect();
-    const visible = rect.bottom > 0 && rect.top < window.innerHeight;
-
-    if (visible) {
+    if (rect.bottom > 0 && rect.top < window.innerHeight) {
       const progress = Math.min(Math.max(-rect.top / Math.max(hero.offsetHeight, 1), 0), 1);
       hero.style.setProperty("--hero-shift", `${progress * 34}px`);
       hero.style.setProperty("--pixel-shift", `${progress * 18}px`);
     }
-
     ticking = false;
   };
 
   const requestUpdate = () => {
     if (!ticking) {
-      window.requestAnimationFrame(update);
+      requestAnimationFrame(update);
       ticking = true;
     }
   };
@@ -309,36 +308,22 @@ const setupHeroParallax = () => {
 const setupPointerTilt = () => {
   if (prefersReducedMotion() || !window.matchMedia?.("(pointer:fine)")?.matches) return;
 
-  const surfaces = document.querySelectorAll(
-    ".solution-card,.news-card,.value-card,.team-card,.contact-card,.pain-card,.company-stat"
-  );
-
-  surfaces.forEach((surface) => {
+  document.querySelectorAll(".solution-card,.news-card,.value-card,.team-card,.contact-card,.pain-card,.company-stat").forEach((surface) => {
     surface.addEventListener("pointermove", (event) => {
       const rect = surface.getBoundingClientRect();
       const x = (event.clientX - rect.left) / rect.width - 0.5;
       const y = (event.clientY - rect.top) / rect.height - 0.5;
-      const rotateY = x * 4.5;
-      const rotateX = y * -4.5;
-
-      surface.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-5px)`;
+      surface.style.transform = `perspective(900px) rotateX(${y * -4.5}deg) rotateY(${x * 4.5}deg) translateY(-5px)`;
     });
-
-    surface.addEventListener("pointerleave", () => {
-      surface.style.transform = "";
-    });
+    surface.addEventListener("pointerleave", () => { surface.style.transform = ""; });
   });
 };
 
 const setupNavbar = () => {
   const navbar = document.querySelector(".navbar-cc");
-
-  const updateNavbar = () => {
-    if (navbar) navbar.classList.toggle("is-scrolled", window.scrollY > 12);
-  };
-
-  updateNavbar();
-  window.addEventListener("scroll", updateNavbar, { passive: true });
+  const update = () => navbar?.classList.toggle("is-scrolled", window.scrollY > 12);
+  update();
+  window.addEventListener("scroll", update, { passive: true });
 
   const navCollapse = document.querySelector("#mainNav");
   document.querySelectorAll("#mainNav .nav-link").forEach((link) => {
@@ -367,7 +352,6 @@ const setupContactForm = () => {
 
   contactForm.addEventListener("submit", (event) => {
     event.preventDefault();
-
     if (!contactForm.checkValidity()) {
       contactForm.classList.add("was-validated");
       return;
@@ -391,6 +375,7 @@ const setupContactForm = () => {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadStylesheet("assets/css/theme-v2.css", "theme-v2-css");
+  loadStylesheet("assets/css/brand-integration.css", "brand-integration-css");
 
   if (isHomePage()) {
     loadStylesheet("assets/css/home-sections.css", "home-sections-css");
@@ -398,7 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
     injectTechnologyNewsSection();
   }
 
-  cleanDashCopy();
+  polishSiteCopy();
   setupLinks();
   setupContactForm();
   setupNavbar();
