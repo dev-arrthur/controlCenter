@@ -201,6 +201,44 @@ const polishSiteCopy = () => {
   });
 };
 
+const setupSolutionLinks = () => {
+  const routes = {
+    redes: "solucao-gestao-redes.html",
+    wifi: "solucao-wifi-corporativo.html",
+    seguranca: "solucao-seguranca-informacao.html",
+    backup: "solucao-backup-corporativo.html",
+    servidores: "solucao-servidores.html",
+    vpn: "solucao-vpn-acesso-remoto.html",
+    manutencao: "solucao-manutencao-computadores.html"
+  };
+
+  Object.entries(routes).forEach(([key, url]) => {
+    document.querySelectorAll(`a[href="solucoes.html#${key}"], a[href="#${key}"]`).forEach((link) => {
+      link.href = url;
+    });
+
+    const overviewCard = document.querySelector(`#${key} .solution-card`);
+    if (overviewCard && !overviewCard.querySelector(".service-detail-link")) {
+      const existingAction = overviewCard.querySelector(".mini-link");
+      const actions = document.createElement("div");
+      actions.className = "solution-actions";
+
+      const detailLink = document.createElement("a");
+      detailLink.className = "service-detail-link";
+      detailLink.href = url;
+      detailLink.innerHTML = 'Saiba mais <i class="bi bi-arrow-right"></i>';
+
+      if (existingAction) {
+        existingAction.before(actions);
+        actions.append(detailLink, existingAction);
+      } else {
+        overviewCard.appendChild(actions);
+        actions.appendChild(detailLink);
+      }
+    }
+  });
+};
+
 const setupScrollProgress = () => {
   if (document.querySelector(".scroll-progress")) return;
   const progress = document.createElement("div");
@@ -308,7 +346,7 @@ const setupHeroParallax = () => {
 const setupPointerTilt = () => {
   if (prefersReducedMotion() || !window.matchMedia?.("(pointer:fine)")?.matches) return;
 
-  document.querySelectorAll(".solution-card,.news-card,.value-card,.team-card,.contact-card,.pain-card,.company-stat").forEach((surface) => {
+  document.querySelectorAll(".solution-card,.news-card,.value-card,.team-card,.contact-card,.pain-card,.company-stat,.detail-card").forEach((surface) => {
     surface.addEventListener("pointermove", (event) => {
       const rect = surface.getBoundingClientRect();
       const x = (event.clientX - rect.left) / rect.width - 0.5;
@@ -376,6 +414,7 @@ const setupContactForm = () => {
 document.addEventListener("DOMContentLoaded", () => {
   loadStylesheet("assets/css/theme-v2.css", "theme-v2-css");
   loadStylesheet("assets/css/brand-integration.css", "brand-integration-css");
+  loadStylesheet("assets/css/ui-v3.css", "ui-v3-css");
 
   if (isHomePage()) {
     loadStylesheet("assets/css/home-sections.css", "home-sections-css");
@@ -384,6 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   polishSiteCopy();
+  setupSolutionLinks();
   setupLinks();
   setupContactForm();
   setupNavbar();
