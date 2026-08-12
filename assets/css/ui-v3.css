@@ -1,0 +1,75 @@
+/* UI v3 */
+
+/* Remove as linhas decorativas das seções */
+.eyebrow::before,
+.section-title::after{
+  display:none!important;
+  content:none!important;
+}
+
+.eyebrow{
+  gap:0!important;
+}
+
+/* Botão da área do cliente com preenchimento animado */
+.btn-client{
+  position:relative!important;
+  overflow:hidden!important;
+  isolation:isolate!important;
+  margin-left:.6rem!important;
+  padding:.78rem 1.05rem!important;
+  border:1px solid rgba(15,76,129,.28)!important;
+  border-radius:999px!important;
+  background:
+    linear-gradient(90deg,var(--cc-primary),var(--cc-primary-dark)) left center / 0 100% no-repeat,
+    #fff!important;
+  color:var(--cc-dark)!important;
+  box-shadow:0 8px 24px rgba(8,33,51,.07)!important;
+  transition:background-size .42s cubic-bezier(.16,1,.3,1),color .28s ease,transform .28s cubic-bezier(.16,1,.3,1),box-shadow .28s ease,border-color .28s ease!important;
+}
+
+.btn-client:hover,
+.btn-client:focus-visible{
+  background-size:100% 100%!important;
+  color:#fff!important;
+  border-color:var(--cc-primary)!important;
+  transform:translateY(-2px)!important;
+  box-shadow:0 14px 30px rgba(15,76,129,.18)!important;
+}
+
+.btn-client i{
+  transition:transform .3s cubic-bezier(.16,1,.3,1)!important;
+}
+
+.btn-client:hover i,
+.btn-client:focus-visible i{
+  transform:translate(3px,-3px)!important;
+}
+
+/* Links de detalhes das soluções */
+.service-detail-link{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin-right:18px;
+  color:var(--cc-primary);
+  font-weight:850;
+  text-decoration:none;
+}
+.service-detail-link i{transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.service-detail-link:hover{color:var(--cc-primary-dark)}
+.service-detail-link:hover i{transform:translateX(5px)}
+
+.solution-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:14px 18px;
+  margin-top:auto;
+  padding-top:20px;
+}
+.solution-actions .mini-link{margin-top:0!important}
+
+@media(max-width:991.98px){
+  .btn-client{margin:.55rem 0 0!important;width:max-content}
+}
