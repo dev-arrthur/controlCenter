@@ -1,0 +1,1 @@
+Esta branch contém o refinamento visual solicitado após a primeira versão do carrossel de clientes e do Radar de Tecnologia. O detalhamento está em CHANGELOG-MOTION-V2.md.
