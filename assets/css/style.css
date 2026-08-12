@@ -30,6 +30,11 @@ img,svg{max-width:100%;height:auto}
 .logo-copy{line-height:1}
 .logo-copy strong{display:block;font-size:1rem;letter-spacing:.01em;color:var(--cc-ink)}
 .logo-copy small{display:block;margin-top:6px;font-size:.59rem;letter-spacing:.19em;color:var(--cc-muted)}
+
+/* Logo oficial Control Center */
+.navbar-brand>.logo-mark,.navbar-brand>.logo-copy{display:none}
+.navbar-brand::before{content:"";display:block;width:205px;height:56px;background:url("https://controlcenter.inf.br/images/l1.png") center/contain no-repeat;flex:0 0 auto}
+
 .navbar-cc .nav-link{font-size:.93rem;font-weight:750;color:#263c4d;padding:.75rem .72rem!important;position:relative}
 .navbar-cc .nav-link::after{content:"";position:absolute;left:.72rem;right:.72rem;bottom:.42rem;height:2px;background:var(--cc-secondary);transform:scaleX(0);transition:.2s ease}
 .navbar-cc .nav-link:hover,.navbar-cc .nav-link.current-page{color:var(--cc-primary)}
@@ -86,10 +91,14 @@ img,svg{max-width:100%;height:auto}
 .faq .accordion-item{border:1px solid var(--cc-line);border-radius:16px!important;overflow:hidden;margin-bottom:12px}.faq .accordion-button{font-weight:800;padding:20px 22px;box-shadow:none!important}.faq .accordion-button:not(.collapsed){color:var(--cc-primary);background:#f4faff}.faq .accordion-body{color:var(--cc-muted)}
 
 .footer{background:#06121b;color:rgba(255,255,255,.72);padding:72px 0 0}.footer-logo-wrap{display:inline-flex;align-items:center;gap:10px;color:#fff}.footer .logo-copy strong{color:#fff}.footer .logo-copy small{color:rgba(255,255,255,.55)}.footer h3{color:#fff;font-size:.92rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px}.footer ul{list-style:none;padding:0;margin:0}.footer li+li{margin-top:9px}.footer a{color:rgba(255,255,255,.72);text-decoration:none}.footer a:hover{color:#fff}.footer-bottom{border-top:1px solid rgba(255,255,255,.10);margin-top:50px;padding:20px 0}.footer-credit{width:100%;color:rgba(255,255,255,.64)!important;transition:.2s ease}.footer-credit:hover{color:#fff!important;background:rgba(255,255,255,.025)}
+.footer-logo-wrap>.logo-mark,.footer-logo-wrap>.logo-copy{display:none}
+.footer-logo-wrap{background:#fff;border-radius:14px;padding:9px 12px}
+.footer-logo-wrap::before{content:"";display:block;width:205px;height:56px;background:url("https://controlcenter.inf.br/images/l1.png") center/contain no-repeat}
 
 .whatsapp-float{position:fixed;right:22px;bottom:22px;z-index:999;width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;background:#25d366;color:#fff;font-size:1.55rem;box-shadow:0 14px 36px rgba(0,0,0,.22);transition:.2s ease}.whatsapp-float:hover{color:#fff;transform:translateY(-3px) scale(1.03)}.mobile-quickbar{display:none}
 .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}.reveal.is-visible{opacity:1;transform:none}
 
 @media(max-width:991.98px){.navbar-cc .nav-link{padding:.82rem .2rem!important}.btn-client{margin:.45rem 0 .65rem;text-align:center}.hero{min-height:680px}.hero-content{margin-left:0;max-width:680px;padding:110px 0 90px}.pixel-cluster{opacity:.75}.plan-wrap{overflow-x:auto}.plan-head,.plan-row,.plan-cta-row{min-width:760px}.section-pad{padding:76px 0}.page-hero{padding:82px 0 72px}}
 @media(max-width:767.98px){body{padding-bottom:64px}.hero{min-height:650px}.hero h1{font-size:clamp(2.55rem,12vw,4.35rem)}.pixel-left{left:-46px;opacity:.6}.pixel-right{right:-48px;opacity:.6}.trust-strip{margin-top:-24px}.section-title{font-size:clamp(2rem,9vw,3rem)}.whatsapp-float{display:none}.mobile-quickbar{display:grid;grid-template-columns:1fr 1fr 1.2fr;position:fixed;left:0;right:0;bottom:0;z-index:1000;background:#fff;border-top:1px solid var(--cc-line);box-shadow:0 -12px 28px rgba(10,35,55,.10)}.mobile-quickbar a{padding:11px 8px 9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:.68rem;font-weight:800;text-decoration:none;color:var(--cc-ink)}.mobile-quickbar a i{font-size:1rem;color:var(--cc-primary)}.mobile-quickbar a:last-child{background:var(--cc-primary);color:#fff}.mobile-quickbar a:last-child i{color:#fff}}
+@media(max-width:575.98px){.navbar-brand::before{width:160px;height:44px}.footer-logo-wrap::before{width:185px;height:50px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}.reveal{opacity:1;transform:none}}
