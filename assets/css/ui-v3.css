@@ -209,6 +209,57 @@ main section:has(.solution-card) .container:has(.row > [class*="col-"] .solution
   position:relative;
 }
 
+/* No desktop, os bullets tornam a navegação lateral explícita e clicável. */
+@media(min-width:992px){
+  @supports (scroll-marker-group: after){
+    main section:has(.solution-card) .row:has(.solution-card){
+      scroll-marker-group:after;
+      scrollbar-width:none;
+      padding-bottom:10px!important;
+    }
+
+    main section:has(.solution-card) .row:has(.solution-card)::-webkit-scrollbar{
+      display:none;
+    }
+
+    main section:has(.solution-card) .row:has(.solution-card)::scroll-marker-group{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      margin-top:18px;
+      min-height:18px;
+    }
+
+    main section:has(.solution-card) .row:has(.solution-card) > [class*="col-"]{
+      scroll-snap-stop:always;
+    }
+
+    main section:has(.solution-card) .row:has(.solution-card) > [class*="col-"]::scroll-marker{
+      content:"";
+      width:9px;
+      height:9px;
+      border:0;
+      border-radius:999px;
+      background:rgba(15,76,129,.20);
+      box-shadow:inset 0 0 0 1px rgba(15,76,129,.12);
+      cursor:pointer;
+      transition:width .28s cubic-bezier(.16,1,.3,1),background .28s ease,transform .28s ease;
+    }
+
+    main section:has(.solution-card) .row:has(.solution-card) > [class*="col-"]::scroll-marker:hover{
+      background:rgba(49,168,216,.68);
+      transform:scale(1.08);
+    }
+
+    main section:has(.solution-card) .row:has(.solution-card) > [class*="col-"]::scroll-marker:target-current{
+      width:30px;
+      background:linear-gradient(90deg,var(--cc-primary),#31a8d8);
+      box-shadow:0 4px 12px rgba(15,76,129,.16);
+    }
+  }
+}
+
 @media(max-width:1199.98px) and (min-width:992px){
   .btn-client{
     min-width:166px!important;
