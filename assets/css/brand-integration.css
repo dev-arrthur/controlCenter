@@ -47,10 +47,14 @@
 }
 
 .client-logo-card img{
+  display:block!important;
+  width:auto!important;
+  height:auto!important;
   max-width:190px!important;
   max-height:72px!important;
+  object-fit:contain!important;
   filter:grayscale(1);
-  opacity:.46;
+  opacity:.52;
   transition:filter .32s ease,opacity .32s ease,transform .38s cubic-bezier(.16,1,.3,1)!important;
 }
 
@@ -59,6 +63,23 @@
   filter:grayscale(0);
   opacity:1;
   transform:scale(1.08)!important;
+}
+
+/* A arte da Martins Teixeira possui proporção mais compacta. Mantemos maior presença visual para ela não desaparecer no carrossel. */
+.client-logo-card img[src*="martins-teixeira"]{
+  width:180px!important;
+  max-width:180px!important;
+  max-height:78px!important;
+  opacity:.78!important;
+  transform:scale(1.14)!important;
+  filter:grayscale(.85) contrast(1.08)!important;
+}
+
+.client-logo-card:hover img[src*="martins-teixeira"],
+.client-logo-card:focus-within img[src*="martins-teixeira"]{
+  opacity:1!important;
+  filter:grayscale(0) contrast(1)!important;
+  transform:scale(1.22)!important;
 }
 
 .clients-track{gap:34px!important}
@@ -78,6 +99,18 @@
   .client-logo-card img{
     max-width:150px!important;
     max-height:58px!important;
+  }
+
+  .client-logo-card img[src*="martins-teixeira"]{
+    width:150px!important;
+    max-width:150px!important;
+    max-height:64px!important;
+    transform:scale(1.12)!important;
+  }
+
+  .client-logo-card:hover img[src*="martins-teixeira"],
+  .client-logo-card:focus-within img[src*="martins-teixeira"]{
+    transform:scale(1.18)!important;
   }
 
   .clients-track{gap:22px!important}
