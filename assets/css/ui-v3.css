@@ -16,62 +16,47 @@ body:has(.hero) section:has(.company-panel){
   display:none!important;
 }
 
-/* Botão da área do cliente. Estrutura robusta baseada no texto real do link. */
+/* CTA da área do cliente em uma única linha */
 .btn-client{
   position:relative!important;
   isolation:isolate!important;
   overflow:hidden!important;
-  display:flex!important;
-  align-items:flex-end!important;
+  display:inline-flex!important;
+  align-items:center!important;
   justify-content:flex-start!important;
-  width:218px!important;
-  min-height:62px!important;
-  margin-left:.72rem!important;
-  padding:27px 64px 10px 17px!important;
-  border:1px solid rgba(255,255,255,.14)!important;
-  border-radius:18px!important;
+  width:206px!important;
+  min-height:54px!important;
+  margin-left:.7rem!important;
+  padding:8px 58px 8px 18px!important;
+  border:1px solid rgba(15,76,129,.12)!important;
+  border-radius:16px!important;
   background:
-    radial-gradient(circle at 88% 18%,rgba(255,255,255,.13),transparent 30%),
+    radial-gradient(circle at 86% 18%,rgba(255,255,255,.12),transparent 30%),
     linear-gradient(135deg,var(--cc-primary) 0%,#0d5d94 100%)!important;
   color:#fff!important;
   box-shadow:
-    0 12px 28px rgba(15,76,129,.20),
+    0 10px 24px rgba(15,76,129,.18),
     inset 0 1px 0 rgba(255,255,255,.10)!important;
   font-size:.78rem!important;
   font-weight:850!important;
-  line-height:1.05!important;
+  line-height:1!important;
   letter-spacing:-.01em!important;
   white-space:nowrap!important;
   text-decoration:none!important;
   transform:translateZ(0);
   transition:
-    transform .32s cubic-bezier(.16,1,.3,1),
-    box-shadow .32s ease,
-    border-color .32s ease!important;
+    transform .3s cubic-bezier(.16,1,.3,1),
+    box-shadow .3s ease,
+    border-color .3s ease!important;
 }
 
-/* Pequena legenda superior. O texto principal continua sendo o texto real do HTML. */
+/* Sem microtexto. Mantém apenas o texto real do link em uma linha. */
 .btn-client::before{
-  content:"ÁREA DO CLIENTE"!important;
-  position:absolute!important;
-  z-index:3!important;
-  top:10px!important;
-  left:17px!important;
-  display:block!important;
-  width:auto!important;
-  height:auto!important;
-  inset-block-end:auto!important;
-  background:none!important;
-  color:rgba(255,255,255,.70)!important;
-  font-size:.52rem!important;
-  font-weight:800!important;
-  line-height:1!important;
-  letter-spacing:.10em!important;
-  text-transform:uppercase!important;
-  pointer-events:none!important;
+  display:none!important;
+  content:none!important;
 }
 
-/* Camada de preenchimento no hover */
+/* Preenchimento animado no hover */
 .btn-client::after{
   content:""!important;
   position:absolute!important;
@@ -80,10 +65,10 @@ body:has(.hero) section:has(.company-panel){
   width:100%!important;
   height:100%!important;
   background:
-    radial-gradient(circle at 88% 25%,rgba(49,168,216,.22),transparent 28%),
+    radial-gradient(circle at 84% 22%,rgba(49,168,216,.24),transparent 30%),
     linear-gradient(135deg,#082f4d 0%,var(--cc-primary-dark) 100%)!important;
   transform:translateX(-102%)!important;
-  transition:transform .52s cubic-bezier(.16,1,.3,1)!important;
+  transition:transform .48s cubic-bezier(.16,1,.3,1)!important;
 }
 
 .btn-client:hover::after,
@@ -95,24 +80,25 @@ body:has(.hero) section:has(.company-panel){
 .btn-client i{
   position:absolute!important;
   z-index:4!important;
-  top:7px!important;
-  right:7px!important;
-  width:48px!important;
-  height:48px!important;
+  top:6px!important;
+  right:6px!important;
+  width:42px!important;
+  height:42px!important;
   margin:0!important;
   display:grid!important;
   place-items:center!important;
-  border-radius:14px!important;
+  border-radius:12px!important;
   background:#fff!important;
   color:var(--cc-dark)!important;
   font-size:0!important;
   box-shadow:
-    0 5px 16px rgba(7,23,34,.10),
+    0 4px 14px rgba(7,23,34,.10),
     inset 0 0 0 1px rgba(15,76,129,.04)!important;
   transition:
-    transform .34s cubic-bezier(.16,1,.3,1),
-    box-shadow .28s ease,
-    background .28s ease!important;
+    transform .32s cubic-bezier(.16,1,.3,1),
+    box-shadow .26s ease,
+    background .26s ease,
+    color .26s ease!important;
 }
 
 .btn-client i::before{
@@ -122,26 +108,28 @@ body:has(.hero) section:has(.company-panel){
 .btn-client i::after{
   content:"→";
   display:block;
-  font-size:1.16rem;
+  font-size:1.12rem;
   font-weight:500;
   line-height:1;
-  transition:transform .3s cubic-bezier(.16,1,.3,1);
+  transition:transform .28s cubic-bezier(.16,1,.3,1);
 }
 
 .btn-client:hover,
 .btn-client:focus-visible{
   color:#fff!important;
   transform:translateY(-3px)!important;
-  border-color:rgba(49,168,216,.32)!important;
+  border-color:rgba(49,168,216,.28)!important;
   box-shadow:
-    0 18px 38px rgba(15,76,129,.26),
-    0 0 0 4px rgba(49,168,216,.06)!important;
+    0 17px 34px rgba(15,76,129,.24),
+    0 0 0 4px rgba(49,168,216,.055)!important;
 }
 
 .btn-client:hover i,
 .btn-client:focus-visible i{
   transform:translateX(2px) scale(1.04)!important;
-  box-shadow:0 8px 20px rgba(7,23,34,.14)!important;
+  background:#f8fcff!important;
+  color:var(--cc-primary-dark)!important;
+  box-shadow:0 7px 18px rgba(7,23,34,.14)!important;
 }
 
 .btn-client:hover i::after,
@@ -154,7 +142,7 @@ body:has(.hero) section:has(.company-panel){
 }
 
 .btn-client:focus-visible{
-  outline:3px solid rgba(49,168,216,.28)!important;
+  outline:3px solid rgba(49,168,216,.26)!important;
   outline-offset:3px!important;
 }
 
@@ -185,43 +173,34 @@ body:has(.hero) section:has(.company-panel){
 @media(max-width:1199.98px) and (min-width:992px){
   .btn-client{
     width:190px!important;
-    min-height:56px!important;
+    min-height:50px!important;
     margin-left:.45rem!important;
-    padding:24px 56px 9px 14px!important;
-    border-radius:16px!important;
+    padding:7px 54px 7px 15px!important;
+    border-radius:15px!important;
     font-size:.72rem!important;
   }
-  .btn-client::before{
-    top:9px!important;
-    left:14px!important;
-    font-size:.47rem!important;
+  .btn-client i{
+    top:5px!important;
+    right:5px!important;
+    width:40px!important;
+    height:40px!important;
+    border-radius:11px!important;
+  }
+}
+
+@media(max-width:991.98px){
+  .btn-client{
+    width:min(100%,270px)!important;
+    min-height:56px!important;
+    margin:.75rem 0 .25rem!important;
+    padding:8px 62px 8px 18px!important;
+    font-size:.82rem!important;
   }
   .btn-client i{
     top:6px!important;
     right:6px!important;
     width:44px!important;
     height:44px!important;
-    border-radius:12px!important;
-  }
-}
-
-@media(max-width:991.98px){
-  .btn-client{
-    width:min(100%,300px)!important;
-    min-height:64px!important;
-    margin:.75rem 0 .25rem!important;
-    padding:28px 68px 11px 18px!important;
-    font-size:.82rem!important;
-  }
-  .btn-client::before{
-    top:11px!important;
-    left:18px!important;
-  }
-  .btn-client i{
-    top:7px!important;
-    right:7px!important;
-    width:50px!important;
-    height:50px!important;
   }
 }
 
