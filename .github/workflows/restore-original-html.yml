@@ -1,0 +1,122 @@
+name: Restore original HTML and static Section 1
+
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-original-html.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore supplied layout and apply only requested assets
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('index.backup.html')
+          target = Path('index.html')
+          html = source.read_text(encoding='utf-8')
+
+          # Mantém exatamente o layout original e apenas aponta a logo já existente em /imgs.
+          html = html.replace(
+              'type="image/png"\n        href="assets/images/logo-controlcenter.png"',
+              'type="image/webp"\n        href="imgs/logo-controlcenter.webp"'
+          )
+          html = html.replace(
+              'src="assets/images/logo-controlcenter.png"',
+              'src="imgs/logo-controlcenter.webp"'
+          )
+
+          # Section 1: usa a imagem PNG informada e remove qualquer animação/pulo.
+          css_start = html.index('        .hero-visual {')
+          css_end = html.index('        .hero-panel {', css_start)
+          static_css = '''        .hero-visual {
+              min-height: 590px;
+
+              position: relative;
+
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              background: transparent;
+
+              animation: none;
+          }
+
+          .hero-art {
+              width: min(760px, 118%);
+              max-width: none;
+              height: auto;
+
+              position: relative;
+
+              display: block;
+
+              object-fit: contain;
+
+              background: transparent;
+
+              border: 0;
+
+              box-shadow: none;
+
+              transform: none;
+
+              animation: none;
+
+              transition: none;
+
+              filter:
+                  drop-shadow(
+                      0 28px 24px
+                      rgba(23,79,130,.10)
+                  );
+          }
+
+  '''
+          # Normaliza a indentação do bloco gerado sem tocar no restante do arquivo.
+          static_css = static_css.replace('          .hero-art', '        .hero-art')
+          static_css = static_css.replace('              ', '            ')
+          html = html[:css_start] + static_css + html[css_end:]
+
+          visual_start = html.index('        <div class="hero-visual">')
+          visual_end = html.index('\n\n\n    </div>\n\n</section>', visual_start)
+          static_visual = '''        <div class="hero-visual">
+
+            <img
+                class="hero-art"
+                src="imgs/imagem1ControlTech.png"
+                width="1536"
+                height="1024"
+                alt="Ecossistema ControlCenter com servidores, nuvem, segurança, suporte e gestão"
+                fetchpriority="high"
+                decoding="async"
+            >
+
+        </div>'''
+          html = html[:visual_start] + static_visual + html[visual_end:]
+
+          target.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit restored index
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "fix: restore original HTML with static Section 1 image"
+          git push
