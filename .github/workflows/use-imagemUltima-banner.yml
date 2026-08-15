@@ -2,8 +2,8 @@ name: Use imagemUltima security banner
 
 on:
   push:
-    paths:
-      - '.github/workflows/use-imagemUltima-banner.yml'
+    paths-ignore:
+      - 'index.html'
 
 permissions:
   contents: write
@@ -54,10 +54,8 @@ jobs:
 
         </div>'''
 
-          if old not in html:
-              raise RuntimeError('Security visual block not found; index.html was not changed.')
-
-          html = html.replace(old, new, 1)
+          if old in html:
+              html = html.replace(old, new, 1)
 
           start_marker = '/* SECURITY IMAGE OVERRIDE START */'
           end_marker = '/* SECURITY IMAGE OVERRIDE END */'
@@ -127,5 +125,3 @@ jobs:
           fi
           git commit -m "feat: use imagemUltima in security section"
           git push
-
-# trigger: 2026-08-15
