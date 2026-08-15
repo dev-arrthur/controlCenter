@@ -4418,6 +4418,40 @@
 
         /* CLIENT CAROUSEL + HERO SPACING END */
 
+
+
+        /* SECURITY IMAGE OVERRIDE START */
+        .security-visual {
+            min-height: 570px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            overflow: visible;
+        }
+
+        .security-image {
+            width: min(100%, 560px);
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            transform: none;
+        }
+
+        @media (max-width: 850px) {
+            .security-visual { min-height: 430px; }
+            .security-image { width: min(100%, 500px); }
+        }
+
+        @media (max-width: 600px) {
+            .security-visual { min-height: 340px; }
+            .security-image { width: min(100%, 420px); }
+        }
+        /* SECURITY IMAGE OVERRIDE END */
+
     </style>
 
 </head>
@@ -5572,20 +5606,13 @@
 
         <div class="security-visual reveal-left">
 
-
-            <div class="security-lines"></div>
-
-
-            <div class="security-ring">
-
-                <div class="security-core">
-
-                    <i class="bi bi-shield-check"></i>
-
-                </div>
-
-            </div>
-
+            <img
+                class="security-image"
+                src="imgs/imagemUltima.png"
+                alt="Ilustracao de seguranca em camadas da ControlCenter"
+                loading="lazy"
+                decoding="async"
+            >
 
         </div>
 
