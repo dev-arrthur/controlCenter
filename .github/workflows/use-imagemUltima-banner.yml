@@ -1,67 +1,65 @@
-name: Use imagemUltima security banner
+name: Update security banner
 
-on:
-  push:
-    paths-ignore:
-      - 'index.html'
+on: [push]
 
 permissions:
   contents: write
 
 jobs:
-  update-banner:
+  update:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Replace security visual with imagemUltima
+      - name: Update security visual
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('index.html')
           html = path.read_text(encoding='utf-8')
 
-          old = '''        <div class="security-visual reveal-left">
+          start_tag = '<div class="security-visual reveal-left">'
+          start = html.find(start_tag)
+          if start == -1:
+              raise SystemExit('security visual not found')
 
+          depth = 0
+          end = None
+          for match in re.finditer(r'<div\b|</div>', html[start:]):
+              if match.group(0).startswith('<div'):
+                  depth += 1
+              else:
+                  depth -= 1
+                  if depth == 0:
+                      end = start + match.end()
+                      break
 
-            <div class="security-lines"></div>
+          if end is None:
+              raise SystemExit('security visual closing div not found')
 
-
-            <div class="security-ring">
-
-                <div class="security-core">
-
-                    <i class="bi bi-shield-check"></i>
-
-                </div>
-
-            </div>
-
-
-        </div>'''
-
-          new = '''        <div class="security-visual reveal-left">
+          replacement = '''<div class="security-visual reveal-left">
 
             <img
                 class="security-image"
                 src="imgs/imagemUltima.png"
-                alt="Ilustração de segurança em camadas da ControlCenter"
+                alt="Ilustracao de seguranca em camadas da ControlCenter"
                 loading="lazy"
                 decoding="async"
             >
 
         </div>'''
 
-          if old in html:
-              html = html.replace(old, new, 1)
+          html = html[:start] + replacement + html[end:]
 
-          start_marker = '/* SECURITY IMAGE OVERRIDE START */'
-          end_marker = '/* SECURITY IMAGE OVERRIDE END */'
-          if start_marker in html and end_marker in html:
-              a = html.index(start_marker)
-              b = html.index(end_marker, a) + len(end_marker)
+          marker_a = '/* SECURITY IMAGE OVERRIDE START */'
+          marker_b = '/* SECURITY IMAGE OVERRIDE END */'
+          if marker_a in html and marker_b in html:
+              a = html.index(marker_a)
+              b = html.index(marker_b, a) + len(marker_b)
               html = html[:a] + html[b:]
 
           css = '''
@@ -88,23 +86,13 @@ jobs:
         }
 
         @media (max-width: 850px) {
-            .security-visual {
-                min-height: 430px;
-            }
-
-            .security-image {
-                width: min(100%, 500px);
-            }
+            .security-visual { min-height: 430px; }
+            .security-image { width: min(100%, 500px); }
         }
 
         @media (max-width: 600px) {
-            .security-visual {
-                min-height: 340px;
-            }
-
-            .security-image {
-                width: min(100%, 420px);
-            }
+            .security-visual { min-height: 340px; }
+            .security-image { width: min(100%, 420px); }
         }
         /* SECURITY IMAGE OVERRIDE END */
 '''
@@ -113,14 +101,13 @@ jobs:
           path.write_text(html, encoding='utf-8')
           PY
 
-      - name: Commit banner update
+      - name: Commit change
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           if git diff --cached --quiet; then
-            echo "No changes needed"
             exit 0
           fi
           git commit -m "feat: use imagemUltima in security section"
