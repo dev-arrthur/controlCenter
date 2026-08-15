@@ -25,7 +25,6 @@ jobs:
           target = Path('index.html')
           html = source.read_text(encoding='utf-8')
 
-          # Mantém exatamente o layout original e apenas aponta a logo já existente em /imgs.
           html = html.replace(
               'type="image/png"\n        href="assets/images/logo-controlcenter.png"',
               'type="image/webp"\n        href="imgs/logo-controlcenter.webp"'
@@ -35,74 +34,51 @@ jobs:
               'src="imgs/logo-controlcenter.webp"'
           )
 
-          # Section 1: usa a imagem PNG informada e remove qualquer animação/pulo.
           css_start = html.index('        .hero-visual {')
           css_end = html.index('        .hero-panel {', css_start)
-          static_css = '''        .hero-visual {
-              min-height: 590px;
-
-              position: relative;
-
-              display: flex;
-              align-items: center;
-              justify-content: center;
-
-              background: transparent;
-
-              animation: none;
-          }
-
-          .hero-art {
-              width: min(760px, 118%);
-              max-width: none;
-              height: auto;
-
-              position: relative;
-
-              display: block;
-
-              object-fit: contain;
-
-              background: transparent;
-
-              border: 0;
-
-              box-shadow: none;
-
-              transform: none;
-
-              animation: none;
-
-              transition: none;
-
-              filter:
-                  drop-shadow(
-                      0 28px 24px
-                      rgba(23,79,130,.10)
-                  );
-          }
-
-  '''
-          # Normaliza a indentação do bloco gerado sem tocar no restante do arquivo.
-          static_css = static_css.replace('          .hero-art', '        .hero-art')
-          static_css = static_css.replace('              ', '            ')
+          static_css = (
+              '        .hero-visual {\n'
+              '            min-height: 590px;\n\n'
+              '            position: relative;\n\n'
+              '            display: flex;\n'
+              '            align-items: center;\n'
+              '            justify-content: center;\n\n'
+              '            background: transparent;\n\n'
+              '            animation: none;\n'
+              '        }\n\n'
+              '        .hero-art {\n'
+              '            width: min(760px, 118%);\n'
+              '            max-width: none;\n'
+              '            height: auto;\n\n'
+              '            position: relative;\n\n'
+              '            display: block;\n\n'
+              '            object-fit: contain;\n\n'
+              '            background: transparent;\n'
+              '            border: 0;\n'
+              '            box-shadow: none;\n'
+              '            transform: none;\n'
+              '            animation: none;\n'
+              '            transition: none;\n\n'
+              '            filter: drop-shadow(0 28px 24px rgba(23,79,130,.10));\n'
+              '        }\n\n'
+          )
           html = html[:css_start] + static_css + html[css_end:]
 
           visual_start = html.index('        <div class="hero-visual">')
           visual_end = html.index('\n\n\n    </div>\n\n</section>', visual_start)
-          static_visual = '''        <div class="hero-visual">
-
-            <img
-                class="hero-art"
-                src="imgs/imagem1ControlTech.png"
-                width="1536"
-                height="1024"
-                alt="Ecossistema ControlCenter com servidores, nuvem, segurança, suporte e gestão"
-                fetchpriority="high"
-                decoding="async"
-            >
-
-        </div>'''
+          static_visual = (
+              '        <div class="hero-visual">\n\n'
+              '            <img\n'
+              '                class="hero-art"\n'
+              '                src="imgs/imagem1ControlTech.png"\n'
+              '                width="1536"\n'
+              '                height="1024"\n'
+              '                alt="Ecossistema ControlCenter com servidores, nuvem, segurança, suporte e gestão"\n'
+              '                fetchpriority="high"\n'
+              '                decoding="async"\n'
+              '            >\n\n'
+              '        </div>'
+          )
           html = html[:visual_start] + static_visual + html[visual_end:]
 
           target.write_text(html, encoding='utf-8')
