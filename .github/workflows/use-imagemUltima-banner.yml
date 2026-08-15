@@ -1,0 +1,129 @@
+name: Use imagemUltima security banner
+
+on:
+  push:
+    paths:
+      - '.github/workflows/use-imagemUltima-banner.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-banner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace security visual with imagemUltima
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+
+          old = '''        <div class="security-visual reveal-left">
+
+
+            <div class="security-lines"></div>
+
+
+            <div class="security-ring">
+
+                <div class="security-core">
+
+                    <i class="bi bi-shield-check"></i>
+
+                </div>
+
+            </div>
+
+
+        </div>'''
+
+          new = '''        <div class="security-visual reveal-left">
+
+            <img
+                class="security-image"
+                src="imgs/imagemUltima.png"
+                alt="Ilustração de segurança em camadas da ControlCenter"
+                loading="lazy"
+                decoding="async"
+            >
+
+        </div>'''
+
+          if old not in html:
+              raise RuntimeError('Security visual block not found; index.html was not changed.')
+
+          html = html.replace(old, new, 1)
+
+          start_marker = '/* SECURITY IMAGE OVERRIDE START */'
+          end_marker = '/* SECURITY IMAGE OVERRIDE END */'
+          if start_marker in html and end_marker in html:
+              a = html.index(start_marker)
+              b = html.index(end_marker, a) + len(end_marker)
+              html = html[:a] + html[b:]
+
+          css = '''
+
+        /* SECURITY IMAGE OVERRIDE START */
+        .security-visual {
+            min-height: 570px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            overflow: visible;
+        }
+
+        .security-image {
+            width: min(100%, 560px);
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            transform: none;
+        }
+
+        @media (max-width: 850px) {
+            .security-visual {
+                min-height: 430px;
+            }
+
+            .security-image {
+                width: min(100%, 500px);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .security-visual {
+                min-height: 340px;
+            }
+
+            .security-image {
+                width: min(100%, 420px);
+            }
+        }
+        /* SECURITY IMAGE OVERRIDE END */
+'''
+
+          html = html.replace('    </style>', css + '\n    </style>', 1)
+          path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit banner update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "feat: use imagemUltima in security section"
+          git push
