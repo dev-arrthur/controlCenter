@@ -11,7 +11,7 @@ if start == -1:
 
 depth = 0
 end = None
-for match in re.finditer(r"<div\\b|</div>", html[start:]):
+for match in re.finditer(r"<div\b|</div>", html[start:]):
     if match.group(0).startswith("<div"):
         depth += 1
     else:
