@@ -4332,16 +4332,16 @@
             display: block;
             position: relative;
             overflow: hidden;
-            -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-            mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+            -webkit-mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent);
         }
 
         .client-logos-track {
             width: max-content;
             display: flex;
             align-items: center;
-            gap: 58px;
-            animation: clientLogoCarousel 28s linear infinite;
+            gap: 18px;
+            animation: clientLogoCarousel 24s linear infinite;
             will-change: transform;
         }
 
@@ -4350,9 +4350,9 @@
         }
 
         .client-logo {
-            width: 185px;
-            min-width: 185px;
-            min-height: 76px;
+            width: 120px;
+            min-width: 120px;
+            min-height: 64px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -4366,8 +4366,8 @@
         .client-logo img {
             width: auto;
             height: auto;
-            max-width: 180px;
-            max-height: 70px;
+            max-width: 120px;
+            max-height: 58px;
             object-fit: contain;
         }
 
@@ -4379,7 +4379,7 @@
 
         @keyframes clientLogoCarousel {
             from { transform: translate3d(0, 0, 0); }
-            to { transform: translate3d(calc(-50% - 29px), 0, 0); }
+            to { transform: translate3d(calc(-50% - 9px), 0, 0); }
         }
 
         @media (max-width: 1200px) {
@@ -4389,9 +4389,9 @@
 
         @media (max-width: 850px) {
             .client-logos { width: 100%; display: block; }
-            .client-logos-track { gap: 42px; animation-duration: 24s; }
-            .client-logo { width: 165px; min-width: 165px; min-height: 70px; }
-            .client-logo img { max-width: 160px; max-height: 62px; }
+            .client-logos-track { gap: 24px; animation-duration: 22s; }
+            .client-logo { width: 145px; min-width: 145px; min-height: 66px; }
+            .client-logo img { max-width: 145px; max-height: 58px; }
             .hero-art { width: min(560px, 94%); }
         }
 
