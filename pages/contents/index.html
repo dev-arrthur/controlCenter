@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Conteúdos | ControlCenter</title>
+  <meta name="description" content="Conteúdos práticos sobre segurança, infraestrutura, backup, redes, servidores, suporte e gestão de TI para empresas.">
+  <link rel="icon" href="../../imgs/logo-controlcenter.webp">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../solutions/navbar.css">
+  <link rel="stylesheet" href="contents.css">
+</head>
+<body class="contents-page">
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<header class="navbar" id="navbar">
+  <div class="container navbar-inner">
+    <a href="../../index.html#inicio" class="brand-logo" aria-label="ControlCenter - Página inicial"><img src="../../imgs/logo-controlcenter.webp" alt="ControlCenter"></a>
+    <nav class="nav">
+      <ul class="nav-links">
+        <li><a href="../../index.html#inicio">Home</a></li>
+        <li class="mega-wrapper">
+          <a href="../../index.html#solucoes">Soluções <i class="bi bi-chevron-down"></i></a>
+          <div class="mega-menu">
+            <div class="container mega-grid">
+              <div class="mega-intro"><span class="mega-label">Soluções ControlCenter</span><h3>Tecnologia preparada para sua operação.</h3><p>Infraestrutura, segurança e suporte trabalhando juntos para manter sua empresa disponível, produtiva e protegida.</p></div>
+              <div class="mega-col"><h4>Infraestrutura</h4><a href="../solutions/gestao-de-redes.html"><i class="bi bi-diagram-3"></i>Gestão de Redes</a><a href="../solutions/servidores.html"><i class="bi bi-server"></i>Servidores</a><a href="../solutions/wifi-corporativo.html"><i class="bi bi-wifi"></i>Wi-Fi Corporativo</a><a href="../solutions/conectividade.html"><i class="bi bi-router"></i>Conectividade</a></div>
+              <div class="mega-col"><h4>Segurança</h4><a href="../solutions/seguranca.html"><i class="bi bi-shield-check"></i>Segurança</a><a href="../solutions/firewall.html"><i class="bi bi-bricks"></i>Firewall</a><a href="../solutions/backup.html"><i class="bi bi-cloud-arrow-up"></i>Backup</a><a href="../solutions/monitoramento.html"><i class="bi bi-activity"></i>Monitoramento</a></div>
+              <div class="mega-col"><h4>Serviços</h4><a href="../solutions/suporte-remoto.html"><i class="bi bi-headset"></i>Suporte Remoto</a><a href="../solutions/suporte-presencial.html"><i class="bi bi-person-workspace"></i>Suporte Presencial</a><a href="../solutions/gestao-de-ti.html"><i class="bi bi-gear"></i>Gestão de TI</a><a href="../solutions/manutencao.html"><i class="bi bi-tools"></i>Manutenção</a></div>
+            </div>
+          </div>
+        </li>
+        <li><a href="../company/index.html">Empresa</a></li>
+        <li><a href="../clients/index.html">Clientes</a></li>
+        <li><a class="active" href="index.html">Conteúdos</a></li>
+        <li><a href="../../index.html#contato">Contato</a></li>
+      </ul>
+    </nav>
+    <div class="navbar-actions">
+      <a href="../../index.html#contato" class="btn btn-outline"><span>Falar com especialista</span></a>
+      <a href="#" class="btn btn-primary"><span>Área do Cliente</span><i class="bi bi-arrow-up-right"></i></a>
+      <button class="menu-button" id="menuButton" type="button" aria-label="Abrir menu" aria-expanded="false"><i class="bi bi-list"></i></button>
+    </div>
+  </div>
+</header>
+<nav class="mobile-menu" id="mobileMenu">
+  <a href="../../index.html#inicio">Home <i class="bi bi-arrow-right"></i></a>
+  <a href="../../index.html#solucoes">Soluções <i class="bi bi-arrow-right"></i></a>
+  <a href="../company/index.html">Empresa <i class="bi bi-arrow-right"></i></a>
+  <a href="../clients/index.html">Clientes <i class="bi bi-arrow-right"></i></a>
+  <a href="index.html">Conteúdos <i class="bi bi-arrow-right"></i></a>
+  <a href="../../index.html#contato">Contato <i class="bi bi-arrow-right"></i></a>
+  <a href="#" class="mobile-client">Área do Cliente <i class="bi bi-arrow-up-right"></i></a>
+</nav>
+
+<main>
+  <section class="contents-hero">
+    <div class="container contents-hero-grid">
+      <div>
+        <div class="contents-kicker">Conteúdo para decisões melhores</div>
+        <h1>TI explicada de um jeito <span>útil para o negócio.</span></h1>
+        <p>Guias, análises e conteúdos práticos para ajudar empresas a entender segurança, infraestrutura, continuidade, redes e gestão de TI sem transformar cada decisão em um problema técnico.</p>
+        <form class="contents-search" id="contentSearchForm" role="search">
+          <label for="contentSearch">Buscar conteúdo</label>
+          <input id="contentSearch" type="search" placeholder="Busque por backup, firewall, Wi-Fi, servidores..." autocomplete="off">
+          <button type="submit" aria-label="Buscar"><i class="bi bi-search"></i></button>
+        </form>
+        <div class="hero-topics" aria-label="Tópicos populares">
+          <button type="button" data-topic-filter="seguranca">Segurança</button>
+          <button type="button" data-topic-filter="backup">Backup</button>
+          <button type="button" data-topic-filter="redes">Redes & Wi-Fi</button>
+          <button type="button" data-topic-filter="infraestrutura">Infraestrutura</button>
+          <button type="button" data-topic-filter="gestao">Gestão de TI</button>
+        </div>
+      </div>
+      <div class="contents-visual" aria-hidden="true">
+        <div class="visual-core"><div><i class="bi bi-journal-richtext"></i><strong>ControlCenter</strong></div></div>
+        <div class="visual-chip v1"><i class="bi bi-shield-check"></i>Segurança</div>
+        <div class="visual-chip v2"><i class="bi bi-cloud-arrow-up"></i>Backup</div>
+        <div class="visual-chip v3"><i class="bi bi-diagram-3"></i>Redes</div>
+        <div class="visual-chip v4"><i class="bi bi-server"></i>Servidores</div>
+        <div class="visual-chip v5"><i class="bi bi-activity"></i>Monitoramento</div>
+        <div class="visual-chip v6"><i class="bi bi-gear"></i>Gestão</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section">
+    <div class="container">
+      <div class="section-head"><div class="contents-eyebrow">Em destaque</div><h2>Comece pelo que mais impacta <span>a continuidade da operação.</span></h2><p>Selecionamos temas que ajudam a organizar prioridades e reduzir decisões baseadas apenas em urgência.</p></div>
+      <div class="featured-grid">
+        <a class="featured-main" href="articles/seguranca-em-camadas.html">
+          <i class="bi bi-shield-lock icon-scene"></i>
+          <div class="post-meta"><span class="post-tag">Segurança</span><span>Guia essencial</span><span>8 min</span></div>
+          <h3>Segurança em camadas: por que uma única ferramenta não protege a empresa inteira.</h3>
+          <p>Entenda como rede, firewall, endpoints, backup e monitoramento se complementam em uma estratégia mais consistente.</p>
+          <span class="read-link">Ler conteúdo <i class="bi bi-arrow-right"></i></span>
+        </a>
+        <div class="featured-side">
+          <a class="side-card" href="articles/backup-3-2-1.html"><div><div class="side-icon"><i class="bi bi-cloud-check"></i></div><h3>Backup 3-2-1 sem complicação.</h3><p>Uma forma prática de pensar cópias, locais de armazenamento e recuperação.</p></div><span class="read-link">Ler guia <i class="bi bi-arrow-right"></i></span></a>
+          <a class="side-card" href="articles/monitoramento-ti.html"><div><div class="side-icon"><i class="bi bi-activity"></i></div><h3>Monitorar antes de apagar incêndios.</h3><p>O que observar para descobrir sinais de falha antes que eles virem indisponibilidade.</p></div><span class="read-link">Ler análise <i class="bi bi-arrow-right"></i></span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section soft">
+    <div class="container">
+      <div class="section-head"><div class="contents-eyebrow">Tópicos</div><h2>Explore por <span>área de interesse.</span></h2><p>Uma biblioteca organizada por assuntos para facilitar o caminho entre uma dúvida e a próxima decisão.</p></div>
+      <div class="topic-grid">
+        <button class="topic-card" type="button" data-topic-filter="seguranca"><span>01</span><i class="bi bi-shield-check"></i><h3>Segurança</h3><p>Firewall, proteção em camadas, endpoints, riscos e boas práticas.</p></button>
+        <button class="topic-card" type="button" data-topic-filter="backup"><span>02</span><i class="bi bi-cloud-arrow-up"></i><h3>Backup & Continuidade</h3><p>Cópias, retenção, recuperação e planejamento para incidentes.</p></button>
+        <button class="topic-card" type="button" data-topic-filter="redes"><span>03</span><i class="bi bi-router"></i><h3>Redes & Wi-Fi</h3><p>Cobertura, capacidade, segmentação e organização da conectividade.</p></button>
+        <button class="topic-card" type="button" data-topic-filter="infraestrutura"><span>04</span><i class="bi bi-server"></i><h3>Infraestrutura</h3><p>Servidores, nuvem, ambientes híbridos e capacidade para crescer.</p></button>
+        <button class="topic-card" type="button" data-topic-filter="gestao"><span>05</span><i class="bi bi-kanban"></i><h3>Gestão de TI</h3><p>Inventário, documentação, prioridades e evolução do ambiente.</p></button>
+        <button class="topic-card" type="button" data-topic-filter="suporte"><span>06</span><i class="bi bi-headset"></i><h3>Suporte & Produtividade</h3><p>Atendimento, manutenção e experiência do usuário no dia a dia.</p></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section" id="biblioteca">
+    <div class="container">
+      <div class="section-head"><div class="contents-eyebrow">Biblioteca</div><h2>Conteúdos para <span>consultar, salvar e compartilhar.</span></h2><p>Use os filtros ou a busca para encontrar o assunto que você precisa.</p></div>
+      <div class="library-tools">
+        <div class="filter-row" role="group" aria-label="Filtrar conteúdos">
+          <button class="filter-btn active" type="button" data-filter="todos">Todos</button>
+          <button class="filter-btn" type="button" data-filter="seguranca">Segurança</button>
+          <button class="filter-btn" type="button" data-filter="backup">Backup</button>
+          <button class="filter-btn" type="button" data-filter="redes">Redes</button>
+          <button class="filter-btn" type="button" data-filter="infraestrutura">Infraestrutura</button>
+          <button class="filter-btn" type="button" data-filter="gestao">Gestão</button>
+          <button class="filter-btn" type="button" data-filter="suporte">Suporte</button>
+        </div>
+        <div class="library-count" id="libraryCount">6 conteúdos</div>
+      </div>
+      <div class="posts-grid">
+        <article class="post-card" data-category="seguranca" data-search="seguranca camadas firewall endpoint proteção riscos"><div class="post-icon"><i class="bi bi-shield-lock"></i></div><div class="post-meta"><span>Segurança</span><span>8 min</span></div><h3>Segurança em camadas para empresas.</h3><p>Como combinar controles diferentes para reduzir dependência de uma única barreira.</p><a class="read-link" href="articles/seguranca-em-camadas.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>
+        <article class="post-card" data-category="backup" data-search="backup 321 cópia recuperação retenção dados"><div class="post-icon"><i class="bi bi-cloud-check"></i></div><div class="post-meta"><span>Backup</span><span>7 min</span></div><h3>Backup 3-2-1: um ponto de partida prático.</h3><p>O princípio por trás de uma estratégia que evita depender de uma única cópia ou de um único lugar.</p><a class="read-link" href="articles/backup-3-2-1.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>
+        <article class="post-card" data-category="redes" data-search="wifi corporativo cobertura capacidade interferencia rede"><div class="post-icon"><i class="bi bi-wifi"></i></div><div class="post-meta"><span>Redes & Wi-Fi</span><span>6 min</span></div><h3>Wi-Fi corporativo: cobertura não é tudo.</h3><p>Por que quantidade de usuários, interferência e capacidade importam tanto quanto alcance.</p><a class="read-link" href="articles/wifi-corporativo.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>
+        <article class="post-card" data-category="infraestrutura" data-search="servidor local nuvem hibrido infraestrutura cloud"><div class="post-icon"><i class="bi bi-server"></i></div><div class="post-meta"><span>Infraestrutura</span><span>8 min</span></div><h3>Servidor local, nuvem ou híbrido?</h3><p>Critérios para comparar caminhos sem cair em uma resposta única para todas as empresas.</p><a class="read-link" href="articles/servidor-nuvem-hibrido.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>
+        <article class="post-card" data-category="gestao" data-search="gestao ti proativa inventario documentação planejamento"><div class="post-icon"><i class="bi bi-kanban"></i></div><div class="post-meta"><span>Gestão de TI</span><span>7 min</span></div><h3>Como sair de uma TI reativa.</h3><p>Inventário, documentação, prioridades e acompanhamento para diminuir improvisos.</p><a class="read-link" href="articles/gestao-ti-proativa.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>
+        <article class="post-card" data-category="seguranca" data-search="monitoramento ti alerta disponibilidade falha desempenho"><div class="post-icon"><i class="bi bi-activity"></i></div><div class="post-meta"><span>Monitoramento</span><span>6 min</span></div><h3>Monitoramento de TI: o que vale acompanhar.</h3><p>Disponibilidade, capacidade e sinais de degradação que ajudam a agir antes da interrupção.</p><a class="read-link" href="articles/monitoramento-ti.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="resource-strip">
+    <div class="container">
+      <div class="resource-box"><div><small>Precisa transformar conteúdo em ação?</small><h3>Use os guias para levantar perguntas — e depois avalie seu ambiente real.</h3><p>Conteúdo ajuda a organizar o raciocínio, mas decisões de infraestrutura e segurança precisam considerar contexto, criticidade e operação.</p></div><a href="../../index.html#contato">Falar com especialista <i class="bi bi-arrow-up-right"></i></a></div>
+    </div>
+  </section>
+
+  <section class="contents-cta">
+    <div class="container contents-cta-grid"><div><span>Fale conosco</span><h2>Tem um tema que você quer entender melhor?</h2><p>Converse com a ControlCenter. Podemos ajudar a transformar uma dúvida técnica em próximos passos claros para sua empresa.</p></div><a href="../../index.html#contato">Fale conosco <i class="bi bi-arrow-up-right"></i></a></div>
+  </section>
+</main>
+
+<footer class="contents-footer">
+  <div class="container">
+    <div class="contents-footer-grid">
+      <div class="contents-footer-brand"><img src="../../imgs/logo-controlcenter.webp" alt="ControlCenter"><p>Conteúdo, infraestrutura, segurança e suporte para empresas que precisam tomar decisões de TI com mais clareza.</p></div>
+      <div><h4>Institucional</h4><a href="../../index.html#inicio">Home</a><a href="../company/index.html">Empresa</a><a href="../clients/index.html">Clientes</a><a href="index.html">Conteúdos</a><a href="../../index.html#contato">Fale conosco</a></div>
+      <div><h4>Infraestrutura</h4><a href="../solutions/gestao-de-redes.html">Gestão de Redes</a><a href="../solutions/servidores.html">Servidores</a><a href="../solutions/wifi-corporativo.html">Wi-Fi Corporativo</a><a href="../solutions/conectividade.html">Conectividade</a></div>
+      <div><h4>Segurança</h4><a href="../solutions/seguranca.html">Segurança</a><a href="../solutions/firewall.html">Firewall</a><a href="../solutions/backup.html">Backup</a><a href="../solutions/monitoramento.html">Monitoramento</a></div>
+      <div><h4>Serviços</h4><a href="../solutions/suporte-remoto.html">Suporte Remoto</a><a href="../solutions/suporte-presencial.html">Suporte Presencial</a><a href="../solutions/gestao-de-ti.html">Gestão de TI</a><a href="../solutions/manutencao.html">Manutenção</a></div>
+    </div>
+    <div class="contents-footer-bottom"><span>© 2026 ControlCenter. Todos os direitos reservados.</span><a href="../../index.html#contato">Fale com a ControlCenter</a></div>
+  </div>
+</footer>
+
+<a class="contact-float" href="../../index.html#contato" aria-label="Fale conosco"><i class="bi bi-chat-dots"></i><span>Fale conosco</span></a>
+<script src="../solutions/navbar.js"></script>
+<script src="contents.js"></script>
+</body>
+</html>
