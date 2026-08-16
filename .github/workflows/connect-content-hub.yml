@@ -1,0 +1,87 @@
+name: Connect content hub
+
+on:
+  push:
+    branches:
+      - feat/content-hub-contact
+    paths:
+      - '.github/workflows/connect-content-hub.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/content-hub-contact
+
+      - name: Connect content navigation and floating contact
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          FLOAT_STYLE = '''\n<style id="global-contact-float-style">\n.global-contact-float{position:fixed;right:24px;bottom:24px;z-index:970;min-height:52px;padding:0 18px;display:inline-flex;align-items:center;gap:10px;border-radius:999px;color:#fff!important;background:#174f82;box-shadow:0 16px 35px rgba(23,79,130,.28);font:700 12px Inter,Arial,sans-serif;text-decoration:none;transition:transform .25s ease,background .25s ease}.global-contact-float:hover{transform:translateY(-3px);background:#0e385f}.global-contact-float i{font-size:17px}@media(max-width:600px){.global-contact-float{right:16px;bottom:16px;width:52px;padding:0;justify-content:center}.global-contact-float span{display:none}}\n</style>\n'''
+
+          def add_float(path: Path, href: str):
+              text = path.read_text(encoding='utf-8')
+              if 'global-contact-float-style' not in text:
+                  text = text.replace('</head>', FLOAT_STYLE + '</head>', 1)
+              if 'class="global-contact-float"' not in text:
+                  markup = f'<a class="global-contact-float" href="{href}" aria-label="Fale conosco"><i class="bi bi-chat-dots"></i><span>Fale conosco</span></a>\n'
+                  text = text.replace('</body>', markup + '</body>', 1)
+              path.write_text(text, encoding='utf-8')
+
+          # Home: point content navigation to the new hub. Keep its existing floating contact implementation.
+          home = Path('index.html')
+          text = home.read_text(encoding='utf-8')
+          text = text.replace('href="#insights"', 'href="pages/contents/index.html"')
+          home.write_text(text, encoding='utf-8')
+
+          # Company
+          company = Path('pages/company/index.html')
+          text = company.read_text(encoding='utf-8')
+          text = text.replace('href="../../index.html#insights"', 'href="../contents/index.html"')
+          company.write_text(text, encoding='utf-8')
+          add_float(company, '../../index.html#contato')
+
+          # Clients
+          clients = Path('pages/clients/index.html')
+          text = clients.read_text(encoding='utf-8')
+          text = text.replace('href="../../index.html#insights"', 'href="../contents/index.html"')
+          clients.write_text(text, encoding='utf-8')
+          add_float(clients, '../../index.html#contato')
+
+          # Solutions
+          for path in Path('pages/solutions').glob('*.html'):
+              text = path.read_text(encoding='utf-8')
+              text = text.replace('href="../../index.html#insights"', 'href="../contents/index.html"')
+              path.write_text(text, encoding='utf-8')
+              add_float(path, '../../index.html#contato')
+
+          # Add support content to the content hub and correct total count.
+          hub = Path('pages/contents/index.html')
+          text = hub.read_text(encoding='utf-8')
+          text = text.replace('id="libraryCount">6 conteúdos', 'id="libraryCount">7 conteúdos')
+          if 'articles/suporte-ti.html' not in text:
+              marker = '      </div>\n    </div>\n  </section>\n\n  <section class="resource-strip">'
+              card = '        <article class="post-card" data-category="suporte" data-search="suporte ti remoto presencial atendimento chamados produtividade"><div class="post-icon"><i class="bi bi-headset"></i></div><div class="post-meta"><span>Suporte</span><span>6 min</span></div><h3>Suporte de TI eficiente começa antes do chamado.</h3><p>Como contexto, histórico e prioridade ajudam a melhorar atendimento e reduzir recorrências.</p><a class="read-link" href="articles/suporte-ti.html">Ler conteúdo <i class="bi bi-arrow-right"></i></a></article>\n'
+              text = text.replace(marker, card + marker, 1)
+          hub.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit updates
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html pages/company/index.html pages/clients/index.html pages/solutions/*.html pages/contents/index.html
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "feat: connect content hub and contact CTA across site"
+          git push origin HEAD:feat/content-hub-contact
