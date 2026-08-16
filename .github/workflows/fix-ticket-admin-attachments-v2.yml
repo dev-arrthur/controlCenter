@@ -32,8 +32,8 @@ jobs:
           node --check api/attachment.js
           grep -q 'id="assigneeControl"' workspace/admin/ticketAdmin.html
           ! grep -q 'id="assigneeControl" disabled' workspace/admin/ticketAdmin.html
-          grep -q 'ticket.assign' api/admin-enterprise.js
-          grep -q 'ticket.unassign' api/admin-enterprise.js
+          grep -q "eventType=wantsUnassign?'unassign':(isInitialAssignment?'assign':'transfer')" api/admin-enterprise.js
+          grep -q 'Atribuição inicial pelo painel administrativo' api/admin-enterprise.js
           ! grep -q 'new MutationObserver' workspace/shared/ticketEnterprise.js
       - name: Commit validated changes and remove temporary files
         run: |
