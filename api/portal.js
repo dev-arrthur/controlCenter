@@ -293,7 +293,7 @@ async function enrichTickets(database, tickets) {
   return tickets.map(t => serializeTicket({ ...t, organizationName: orgMap.get(String(t.organizationId)) || 'Empresa', assignedName: t.assignedTo ? (adminMap.get(String(t.assignedTo)) || '') : '' }));
 }
 function validNewPassword(password) {
-  return typeof password === 'string' && password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
+  return typeof password === 'string' && password.length >= 8 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
 }
 async function uniqueOrganizationCode(database, preferred, name) {
   const base = normalizeCode(preferred) || normalizeCode(name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')) || `cliente-${Date.now()}`;
@@ -489,7 +489,7 @@ async function actionPassword(req, res) {
   const input = await parseBody(req);
   const currentPassword = typeof input.currentPassword === 'string' ? input.currentPassword : '';
   const newPassword = typeof input.newPassword === 'string' ? input.newPassword : '';
-  if (!validNewPassword(newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A nova senha deve ter pelo menos 12 caracteres, com maiúscula, minúscula, número e símbolo.');
+  if (!validNewPassword(newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A nova senha deve ter pelo menos 8 caracteres, com maiúscula, minúscula, número e símbolo.');
   if (!(await bcrypt.compare(currentPassword, session.user.passwordHash || ''))) return fail(res, 401, 'INVALID_PASSWORD', 'A senha atual está incorreta.');
   await session.db.collection('users').updateOne({ _id: session.user._id }, { $set: { passwordHash: await bcrypt.hash(newPassword, 12), updatedAt: new Date() }, $inc: { sessionVersion: 1 } });
   clearCookie(res, CLIENT_COOKIE);
@@ -542,7 +542,7 @@ async function actionAdminPassword(req, res) {
   const input = await parseBody(req);
   const currentPassword = typeof input.currentPassword === 'string' ? input.currentPassword : '';
   const newPassword = typeof input.newPassword === 'string' ? input.newPassword : '';
-  if (!validNewPassword(newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A nova senha deve ter pelo menos 12 caracteres, com maiúscula, minúscula, número e símbolo.');
+  if (!validNewPassword(newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A nova senha deve ter pelo menos 8 caracteres, com maiúscula, minúscula, número e símbolo.');
   if (!(await bcrypt.compare(currentPassword, session.user.passwordHash || ''))) return fail(res, 401, 'INVALID_PASSWORD', 'A senha atual está incorreta.');
   await session.db.collection('users').updateOne(
     { _id: session.user._id },
@@ -720,7 +720,7 @@ async function actionAdminClients(req, res) {
     const email = normalizeEmail(input.email);
     const password = typeof input.password === 'string' ? input.password : '';
     if (companyName.length < 2 || userName.length < 2 || !validEmail(email) || !validNewPassword(password)) {
-      return fail(res, 422, 'VALIDATION_ERROR', 'Informe empresa, usuário, e-mail válido e uma senha com pelo menos 12 caracteres, maiúscula, minúscula, número e símbolo.');
+      return fail(res, 422, 'VALIDATION_ERROR', 'Informe empresa, usuário, e-mail válido e uma senha com pelo menos 8 caracteres, maiúscula, minúscula, número e símbolo.');
     }
     const exists = await session.db.collection('users').findOne({ email, role: { $in: CLIENT_ROLES } });
     if (exists) return fail(res, 409, 'EMAIL_ALREADY_USED', 'Este e-mail já possui acesso de cliente.');
@@ -783,7 +783,7 @@ async function actionAdminUsers(req, res) {
     if (typeof input.active === 'boolean') { set.active = input.active; if (!input.active) incSession = true; }
     if (typeof input.forcePasswordChange === 'boolean') set.forcePasswordChange = input.forcePasswordChange;
     if (input.newPassword !== undefined) {
-      if (!validNewPassword(input.newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A senha temporária deve ter pelo menos 12 caracteres, com maiúscula, minúscula, número e símbolo.');
+      if (!validNewPassword(input.newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A senha temporária deve ter pelo menos 8 caracteres, com maiúscula, minúscula, número e símbolo.');
       set.passwordHash = await bcrypt.hash(input.newPassword, 12);
       set.forcePasswordChange = false;
       incSession = true;

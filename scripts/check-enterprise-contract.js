@@ -31,7 +31,7 @@ must(attachment.includes('MAX_FILE_BYTES = 3 * 1024 * 1024'), 'attachment size l
 must(gateway.includes('enforceRateLimit'), 'portal gateway must enforce persistent rate limits');
 must(gateway.includes('ticket_attachment_archive'), 'closed-ticket attachment metadata must be archived');
 must(portal.includes('TRANSFER_ENDPOINT_REQUIRED'), 'direct assignment must be blocked in legacy admin ticket route');
-must(portal.includes('password.length >= 12'), 'portal passwords must require at least 12 characters');
+must(portal.includes('password.length >= 8'), 'portal passwords must require at least 8 characters');
 must(clientJs.includes('data-message-id'), 'client messages must expose internal message ids for authorized attachment decoration');
 must(adminJs.includes('data-message-id'), 'admin messages must expose internal message ids for authorized attachment decoration');
 must(adminJs.includes('CCAttachments.uploadFiles'), 'admin replies must support attachments');
