@@ -45,6 +45,9 @@ function safeName(value) {
   const cleaned = raw.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
   return (cleaned || 'arquivo').slice(0, 100);
 }
+function originalName(value) {
+  return String(value || 'arquivo').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 180) || 'arquivo';
+}
 function validMagic(buffer, type) {
   if (type === 'image/jpeg') return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
   if (type === 'image/png') return buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
@@ -52,12 +55,38 @@ function validMagic(buffer, type) {
   if (type === 'application/pdf') return buffer.length >= 5 && buffer.subarray(0, 5).toString() === '%PDF-';
   return false;
 }
+function blobAuthOptions() {
+  const token = String(process.env.BLOB_READ_WRITE_TOKEN || '').trim();
+  if (token) return { token };
+  const oidcToken = String(process.env.VERCEL_OIDC_TOKEN || '').trim();
+  const storeId = String(process.env.BLOB_STORE_ID || '').trim();
+  if (oidcToken && storeId) return { oidcToken, storeId };
+  return {};
+}
+function blobAuthMode() {
+  if (String(process.env.BLOB_READ_WRITE_TOKEN || '').trim()) return 'read-write-token';
+  if (String(process.env.VERCEL_OIDC_TOKEN || '').trim() && String(process.env.BLOB_STORE_ID || '').trim()) return 'oidc';
+  return 'not-configured';
+}
+function blobConfigured() { return blobAuthMode() !== 'not-configured'; }
+async function verifyBlobStorage() {
+  if (!blobConfigured()) return { configured: false, connected: false, authMode: 'not-configured' };
+  try {
+    const { list } = await import('@vercel/blob');
+    await list({ limit: 1, ...blobAuthOptions() });
+    return { configured: true, connected: true, authMode: blobAuthMode() };
+  } catch (error) {
+    console.error('BLOB_HEALTH_ERROR', error?.message || error);
+    return { configured: true, connected: false, authMode: blobAuthMode() };
+  }
+}
 function publicAttachment(doc) {
   return {
     id: String(doc._id),
     ticketId: String(doc.ticketId),
     messageId: doc.messageId ? String(doc.messageId) : null,
     fileName: doc.fileName,
+    originalFileName: doc.originalFileName || doc.fileName,
     contentType: doc.contentType,
     size: doc.size,
     sha256: doc.sha256,
@@ -66,35 +95,64 @@ function publicAttachment(doc) {
     internal: doc.internal === true,
     archived: doc.archived === true,
     createdAt: doc.createdAt,
+    archivedAt: doc.archivedAt || null,
     downloadUrl: `/api/attachment?action=download&id=${encodeURIComponent(String(doc._id))}`
   };
 }
 async function archiveTicketAttachmentMetadata(db, ticketId) {
   const active = await db.collection('ticket_attachments').find({ ticketId }).toArray();
-  if (!active.length) return;
+  if (!active.length) return 0;
   const archivedAt = new Date();
   for (const doc of active) {
     await db.collection('ticket_attachment_archive').replaceOne(
       { _id: doc._id },
-      { ...doc, archived: true, archivedAt },
+      { ...doc, archived: true, status: 'archived', archivedAt },
       { upsert: true }
     );
   }
   await db.collection('ticket_attachments').deleteMany({ _id: { $in: active.map(doc => doc._id) } });
+  await db.collection('tickets').updateOne(
+    { _id: ticketId },
+    { $set: { attachmentsArchivedAt: archivedAt, updatedAt: archivedAt } }
+  );
+  return active.length;
 }
 async function rate(session, req, scope, limit, windowMs) {
-  const result = await enforceRateLimit(session.db, {
+  return enforceRateLimit(session.db, {
     scope,
     subject: `${session.kind}:${String(session.user._id)}:${requestIp(req)}`,
     limit,
     windowMs
   });
-  return result;
+}
+async function cleanupOrphanBlob(blob) {
+  if (!blob?.pathname && !blob?.url) return;
+  try {
+    const { del } = await import('@vercel/blob');
+    await del(blob.pathname || blob.url, blobAuthOptions());
+  } catch (error) {
+    console.error('BLOB_ORPHAN_CLEANUP_ERROR', error?.message || error);
+  }
 }
 
 module.exports = async function handler(req, res) {
   try {
     const action = String(req.query.action || 'list').toLowerCase();
+
+    // Health operacional sem expor token, nomes de arquivos ou conteúdo do store.
+    if (action === 'health' && req.method === 'GET') {
+      const storage = await verifyBlobStorage();
+      return ok(res, {
+        service: 'controlcenter-attachments',
+        storage: {
+          provider: 'vercel-blob',
+          access: 'private',
+          ...storage
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const session = await authenticateCookieHeader(req.headers.cookie || '');
     if (!session) return fail(res, 401, 'UNAUTHENTICATED', 'Sessão expirada ou inválida.');
 
@@ -115,12 +173,17 @@ module.exports = async function handler(req, res) {
       const docs = [...active, ...archived]
         .filter(item => session.kind === 'admin' || item.internal !== true)
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      return ok(res, { attachments: docs.map(publicAttachment), storageConfigured: Boolean(process.env.BLOB_READ_WRITE_TOKEN) });
+      return ok(res, {
+        attachments: docs.map(publicAttachment),
+        storageConfigured: blobConfigured(),
+        storageMode: blobAuthMode(),
+        counts: { active: active.length, archived: archived.length, total: docs.length }
+      });
     }
 
     if (action === 'upload' && req.method === 'POST') {
       if (!sameOrigin(req)) return fail(res, 403, 'INVALID_ORIGIN', 'Origem não permitida.');
-      if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos ainda não foi configurado na Vercel.');
+      if (!blobConfigured()) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos ainda não foi configurado.');
       const uploadLimit = await rate(session, req, 'attachment-upload', 12, 10 * 60 * 1000);
       if (!uploadLimit.allowed) {
         res.setHeader('Retry-After', String(uploadLimit.retryAfter));
@@ -132,7 +195,8 @@ module.exports = async function handler(req, res) {
       if (ticket.status === 'fechado') return fail(res, 409, 'TICKET_CLOSED', 'Reabra o chamado antes de enviar anexos.');
 
       const input = await body(req);
-      const fileName = safeName(input.fileName);
+      const displayName = originalName(input.fileName);
+      const fileName = safeName(displayName);
       const contentType = String(input.contentType || '').toLowerCase();
       if (!ALLOWED_TYPES.has(contentType)) return fail(res, 415, 'UNSUPPORTED_FILE_TYPE', 'Envie somente JPG, PNG, WEBP ou PDF.');
       const encoded = String(input.dataBase64 || '').replace(/^data:[^;]+;base64,/, '');
@@ -149,48 +213,83 @@ module.exports = async function handler(req, res) {
       if (String(message.authorId || '') !== String(session.user._id)) return fail(res, 403, 'MESSAGE_OWNER_REQUIRED', 'O anexo só pode ser associado à mensagem que você acabou de enviar.');
       if (session.kind === 'client' && message.internal === true) return fail(res, 403, 'INTERNAL_MESSAGE', 'Operação não permitida.');
 
-      const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-      const { put } = await import('@vercel/blob');
+      const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
       const path = `tickets/${ticket.ticketNumber}/attachments/${Date.now()}-${fileName}`;
-      const blob = await put(path, buffer, {
-        access: 'private',
-        contentType,
-        addRandomSuffix: true
-      });
-      const now = new Date();
-      const doc = {
-        ticketId: ticket._id,
-        organizationId: ticket.organizationId,
-        messageId,
-        uploaderId: session.user._id,
-        uploaderType: session.kind,
-        uploaderName: session.user.name,
-        internal: message.internal === true,
-        fileName,
-        contentType,
-        size: buffer.length,
-        sha256: hash,
-        blobPathname: blob.pathname,
-        blobUrl: blob.url,
-        storage: 'vercel-blob-private',
-        archived: false,
-        createdAt: now
-      };
-      const inserted = await session.db.collection('ticket_attachments').insertOne(doc);
-      doc._id = inserted.insertedId;
-      await audit(session.db, {
-        organizationId: ticket.organizationId,
-        userId: session.user._id,
-        action: 'ticket.attachment.uploaded',
-        entityType: 'ticket_attachment',
-        entityId: doc._id,
-        metadata: { ticketNumber: ticket.ticketNumber, contentType, size: buffer.length, sha256: hash }
-      });
-      return ok(res, { attachment: publicAttachment(doc) }, 201);
+      const { put } = await import('@vercel/blob');
+      let blob = null;
+      let metadataPersisted = false;
+      try {
+        blob = await put(path, buffer, {
+          access: 'private',
+          contentType,
+          addRandomSuffix: true,
+          ...blobAuthOptions()
+        });
+
+        const now = new Date();
+        const doc = {
+          ticketId: ticket._id,
+          ticketNumber: ticket.ticketNumber,
+          organizationId: ticket.organizationId,
+          messageId,
+          uploaderId: session.user._id,
+          uploaderType: session.kind,
+          uploaderName: session.user.name,
+          internal: message.internal === true,
+          fileName,
+          originalFileName: displayName,
+          contentType,
+          size: buffer.length,
+          sha256,
+          blobPathname: blob.pathname,
+          blobUrl: blob.url,
+          blobContentDisposition: blob.contentDisposition || null,
+          storage: 'vercel-blob-private',
+          storageProvider: 'vercel-blob',
+          storageAccess: 'private',
+          storageAuthMode: blobAuthMode(),
+          retention: 'permanent-ticket-record',
+          recordVersion: 2,
+          status: 'active',
+          archived: false,
+          createdAt: now,
+          updatedAt: now
+        };
+        const inserted = await session.db.collection('ticket_attachments').insertOne(doc);
+        doc._id = inserted.insertedId;
+        metadataPersisted = true;
+
+        await session.db.collection('tickets').updateOne(
+          { _id: ticket._id },
+          {
+            $set: { hasAttachments: true, lastAttachmentAt: now, updatedAt: now },
+            $inc: { attachmentCount: 1 }
+          }
+        );
+        await audit(session.db, {
+          organizationId: ticket.organizationId,
+          userId: session.user._id,
+          action: 'ticket.attachment.uploaded',
+          entityType: 'ticket_attachment',
+          entityId: doc._id,
+          metadata: {
+            ticketNumber: ticket.ticketNumber,
+            contentType,
+            size: buffer.length,
+            sha256,
+            storage: 'vercel-blob-private'
+          }
+        });
+        return ok(res, { attachment: publicAttachment(doc), persisted: true }, 201);
+      } catch (error) {
+        if (blob && !metadataPersisted) await cleanupOrphanBlob(blob);
+        console.error('ATTACHMENT_UPLOAD_PERSISTENCE_ERROR', error);
+        return fail(res, 503, 'ATTACHMENT_PERSISTENCE_FAILED', 'Não foi possível armazenar o anexo com segurança. Tente novamente em instantes.');
+      }
     }
 
     if (action === 'download' && req.method === 'GET') {
-      if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos ainda não foi configurado na Vercel.');
+      if (!blobConfigured()) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos ainda não foi configurado.');
       const id = ObjectId.isValid(req.query.id) ? new ObjectId(req.query.id) : null;
       if (!id) return fail(res, 400, 'INVALID_ATTACHMENT', 'Anexo inválido.');
       let attachment = await session.db.collection('ticket_attachments').findOne({ _id: id });
@@ -202,7 +301,8 @@ module.exports = async function handler(req, res) {
       const { get } = await import('@vercel/blob');
       const result = await get(attachment.blobPathname, {
         access: 'private',
-        ifNoneMatch: req.headers['if-none-match'] || undefined
+        ifNoneMatch: req.headers['if-none-match'] || undefined,
+        ...blobAuthOptions()
       });
       if (!result) return fail(res, 404, 'BLOB_NOT_FOUND', 'Arquivo não encontrado no armazenamento.');
       if (result.statusCode === 304) {
@@ -212,7 +312,7 @@ module.exports = async function handler(req, res) {
         return res.end();
       }
       if (result.statusCode !== 200) return fail(res, 404, 'BLOB_NOT_FOUND', 'Arquivo não encontrado no armazenamento.');
-      const encodedName = encodeURIComponent(attachment.fileName).replace(/'/g, '%27');
+      const encodedName = encodeURIComponent(attachment.originalFileName || attachment.fileName).replace(/'/g, '%27');
       res.status(200);
       res.setHeader('Content-Type', result.blob.contentType || attachment.contentType || 'application/octet-stream');
       res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodedName}`);
