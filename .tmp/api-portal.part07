@@ -1,9 +1,0 @@
- (!routes[action]) return fail(res, 404, 'NOT_FOUND', 'Rota do portal não encontrada.');
-    return await routes[action](req, res);
-  } catch (error) {
-    console.error('PORTAL_API_ERROR', action, error);
-    if (error.code === 'MONGODB_URI_NOT_CONFIGURED' || error.code === 'JWT_SECRET_NOT_CONFIGURED') return fail(res, 503, 'PORTAL_NOT_CONFIGURED', 'O portal ainda não foi configurado no ambiente de hospedagem.');
-    if (error.code === 11000) return fail(res, 409, 'DUPLICATE_DATA', 'Já existe um cadastro com estes dados.');
-    return fail(res, 500, 'INTERNAL_ERROR', 'Não foi possível concluir a operação agora.');
-  }
-};
