@@ -11,7 +11,7 @@
   const CATEGORY_LABELS = { suporte:'Suporte', rede:'Rede', wifi:'Wi-Fi', servidor:'Servidor', seguranca:'Segurança', backup:'Backup', email:'E-mail', acesso:'Acesso', equipamento:'Equipamento', outro:'Outro' };
 
   function escapeHtml(value='') {
-    return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
+    return String(value).replace(/[&<>'\"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','\"':'&quot;'}[char]));
   }
   function initials(name='') { return name.split(/\s+/).filter(Boolean).slice(0,2).map(v=>v[0]).join('').toUpperCase() || 'CC'; }
   function date(value, withTime=false) {
@@ -70,7 +70,7 @@
       const alert=$('#loginAlert'); alert?.classList.remove('show');
       const button=$('#loginSubmit'); button.disabled=true; button.innerHTML='<span class="spinner-border"></span> Entrando...';
       try{
-        await CCApi.login({organizationCode:$('#organizationCode').value,email:$('#email').value,password:$('#password').value});
+        await CCApi.login({email:$('#email').value,password:$('#password').value});
         location.replace(DASH);
       }catch(error){if(alert){alert.textContent=error.message;alert.classList.add('show')} button.disabled=false;button.innerHTML='Entrar no portal <i class="bi bi-arrow-right"></i>'}
     });
