@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const { Readable } = require('node:stream');
 const {
   ObjectId,
+  CLIENT_COOKIE,
+  ADMIN_COOKIE,
   authenticateCookieHeader,
   authorizeTicket,
   requestIp,
@@ -33,6 +35,20 @@ function sameOrigin(req) {
     const host = req.headers['x-forwarded-host'] || req.headers.host;
     return !host || new URL(origin).host === host;
   } catch { return false; }
+}
+function requestedPortalKind(req) {
+  const raw = String(req.query?.portal || req.headers['x-portal-kind'] || '').trim().toLowerCase();
+  return raw === 'admin' || raw === 'client' ? raw : '';
+}
+function scopedCookieHeader(req, portalKind) {
+  const raw = String(req.headers.cookie || '');
+  if (!portalKind) return raw;
+  const wanted = portalKind === 'admin' ? ADMIN_COOKIE : CLIENT_COOKIE;
+  return raw
+    .split(';')
+    .map(part => part.trim())
+    .filter(part => part.startsWith(`${wanted}=`))
+    .join('; ');
 }
 async function body(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -121,7 +137,7 @@ async function verifyBlobStorage(force = false) {
 function invalidateBlobHealth() {
   global.__ccBlobHealth = { checkedAt: 0, value: null };
 }
-function publicAttachment(doc) {
+function publicAttachment(doc, portalKind = '') {
   return {
     id: String(doc._id),
     ticketId: String(doc.ticketId),
@@ -137,7 +153,7 @@ function publicAttachment(doc) {
     archived: doc.archived === true,
     createdAt: doc.createdAt,
     archivedAt: doc.archivedAt || null,
-    downloadUrl: `/api/attachment?action=download&id=${encodeURIComponent(String(doc._id))}`
+    downloadUrl: `/api/attachment?action=download&id=${encodeURIComponent(String(doc._id))}${portalKind ? `&portal=${encodeURIComponent(portalKind)}` : ''}`
   };
 }
 async function archiveTicketAttachmentMetadata(db, ticketId) {
@@ -195,8 +211,10 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const session = await authenticateCookieHeader(req.headers.cookie || '');
+    const portalKind = requestedPortalKind(req);
+    const session = await authenticateCookieHeader(scopedCookieHeader(req, portalKind));
     if (!session) return fail(res, 401, 'UNAUTHENTICATED', 'Sessão expirada ou inválida.');
+    if (portalKind && session.kind !== portalKind) return fail(res, 403, 'PORTAL_SESSION_MISMATCH', 'A sessão ativa não pertence a este portal.');
 
     const baseLimit = await rate(session, req, 'attachment-api', 90, 60 * 1000);
     if (!baseLimit.allowed) {
@@ -217,7 +235,7 @@ module.exports = async function handler(req, res) {
         .filter(item => session.kind === 'admin' || item.internal !== true)
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       return ok(res, {
-        attachments: docs.map(publicAttachment),
+        attachments: docs.map(item => publicAttachment(item, session.kind)),
         storageConfigured: storage.connected === true,
         storageMode: storage.authMode,
         counts: { active: active.length, archived: archived.length, total: docs.length }
@@ -325,7 +343,7 @@ module.exports = async function handler(req, res) {
             storage: 'vercel-blob-private'
           }
         });
-        return ok(res, { attachment: publicAttachment(doc), persisted: true }, 201);
+        return ok(res, { attachment: publicAttachment(doc, session.kind), persisted: true }, 201);
       } catch (error) {
         if (blob && !metadataPersisted) await cleanupOrphanBlob(blob);
         invalidateBlobHealth();
