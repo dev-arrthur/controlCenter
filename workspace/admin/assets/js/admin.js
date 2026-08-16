@@ -316,6 +316,7 @@
       try {
         const sent = await CCAdminApi.sendMessage(id, { message, internal:true });
         $('#internalNote').value = '';
+        window.CCAttachments?.clearReplyTarget?.();
         if (window.CCAttachments) {
           try { await window.CCAttachments.uploadFiles({ messageId: sent.message.id, input: $('#internalNoteAttachments') }); }
           catch (uploadError) { toast(`Nota salva, mas o anexo falhou: ${uploadError.message}`, 'error'); }
