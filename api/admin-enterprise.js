@@ -22,7 +22,7 @@ function validEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);}
 function sameOrigin(req){const origin=req.headers.origin;if(!origin)return true;try{const host=req.headers['x-forwarded-host']||req.headers.host;return !host||new URL(origin).host===host;}catch{return false;}}
 async function parseBody(req){if(req.body&&typeof req.body==='object')return req.body;if(typeof req.body==='string'){try{return JSON.parse(req.body||'{}');}catch{return {};}}let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>128*1024)throw new Error('PAYLOAD_TOO_LARGE');}try{return raw?JSON.parse(raw):{};}catch{return {};}}
 function generatedPassword(){return `${crypto.randomBytes(16).toString('base64url')}Aa1!`;}
-function strongPassword(value){return typeof value==='string'&&value.length>=12&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\d/.test(value)&&/[^A-Za-z0-9]/.test(value);}
+function strongPassword(value){return typeof value==='string'&&value.length>=8&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\d/.test(value)&&/[^A-Za-z0-9]/.test(value);}
 function publicTeamUser(u){return{id:String(u._id),name:u.name,email:u.email,role:u.role,active:u.active!==false,forcePasswordChange:u.forcePasswordChange===true,lastLoginAt:u.lastLoginAt||null,createdAt:u.createdAt||null};}
 async function limit(session,req,scope,max,windowMs){return enforceRateLimit(session.db,{scope,subject:`${String(session.user._id)}:${requestIp(req)}`,limit:max,windowMs});}
 async function requireSession(req,res){const session=await authenticateCookieHeader(req.headers.cookie||'');if(!session||session.kind!=='admin')return fail(res,401,'UNAUTHENTICATED','Sessão administrativa expirada ou inválida.');if(session.user.forcePasswordChange===true)return fail(res,428,'PASSWORD_CHANGE_REQUIRED','Redefina sua senha antes de continuar.');return session;}
@@ -44,7 +44,7 @@ async function team(req,res,session){
     const existing=await session.db.collection('users').findOne({organizationId:session.user.organizationId,email:userEmail,role:{$in:ADMIN_ROLES}});
     if(existing)return fail(res,409,'TEAM_USER_EXISTS','Já existe um acesso da equipe com este e-mail.');
     const temporaryPassword=clean(input.temporaryPassword,200)||generatedPassword();
-    if(!strongPassword(temporaryPassword))return fail(res,422,'WEAK_PASSWORD','A senha temporária deve ter no mínimo 12 caracteres, com maiúscula, minúscula, número e símbolo.');
+    if(!strongPassword(temporaryPassword))return fail(res,422,'WEAK_PASSWORD','A senha temporária deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
     const now=new Date();
     const doc={organizationId:session.user.organizationId,name,email:userEmail,emailHash:hashSensitive(userEmail,'email-lookup'),role,passwordHash:await bcrypt.hash(temporaryPassword,12),phone:'',active:true,forcePasswordChange:true,sessionVersion:1,passwordUpdatedAt:now,createdBy:session.user._id,createdAt:now,updatedAt:now};
     const inserted=await session.db.collection('users').insertOne(doc);doc._id=inserted.insertedId;
@@ -67,7 +67,7 @@ async function team(req,res,session){
       update.role=role;update.sessionVersion=Number(target.sessionVersion||1)+1;
     }else if(operation==='reset_password'){
       temporaryPassword=clean(input.temporaryPassword,200)||generatedPassword();
-      if(!strongPassword(temporaryPassword))return fail(res,422,'WEAK_PASSWORD','A senha temporária deve ter no mínimo 12 caracteres, com maiúscula, minúscula, número e símbolo.');
+      if(!strongPassword(temporaryPassword))return fail(res,422,'WEAK_PASSWORD','A senha temporária deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo.');
       update.passwordHash=await bcrypt.hash(temporaryPassword,12);update.forcePasswordChange=true;update.passwordUpdatedAt=now;update.sessionVersion=Number(target.sessionVersion||1)+1;
     }else{return fail(res,422,'INVALID_OPERATION','Operação de equipe inválida.');}
     await session.db.collection('users').updateOne({_id:id},{$set:update});

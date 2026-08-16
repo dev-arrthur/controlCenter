@@ -27,7 +27,7 @@ function required(name) {
   const phone = arg('phone').trim();
 
   if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-    throw new Error('A senha deve ter pelo menos 10 caracteres, com letras e números.');
+    throw new Error('A senha deve ter pelo menos 8 caracteres, com letras e números.');
   }
 
   const client = new MongoClient(uri);
