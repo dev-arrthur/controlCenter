@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "buildCommand": "node scripts/seed-dev-users.js && node scripts/check-project.js",
   "functions": {
     "api/portal.js": {
       "maxDuration": 10
