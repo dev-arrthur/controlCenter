@@ -17,6 +17,7 @@ const gateway = read('api/gateway.js');
 const portal = read('api/portal.js');
 const clientJs = read('workspace/client/assets/js/portal.js');
 const adminJs = read('workspace/admin/assets/js/admin.js');
+const ticketEnterprise = read('workspace/shared/ticketEnterprise.js');
 const clientTicket = read('workspace/client/ticket.html');
 const vercel = JSON.parse(read('vercel.json'));
 
@@ -26,6 +27,9 @@ must(enterprise.includes('bcrypt.hash'), 'team passwords must be bcrypt hashed')
 must(enterprise.includes('forcePasswordChange:true'), 'new team access must force password reset');
 must(enterprise.includes('LAST_ADMIN'), 'last active admin must be protected');
 must(attachment.includes("access: 'private'"), 'attachments must use private Blob storage');
+must(attachment.includes('scopedCookieHeader'), 'attachments must bind authentication to the requesting portal');
+must(attachment.includes('PORTAL_SESSION_MISMATCH'), 'attachment endpoint must reject portal/session mismatch');
+must(ticketEnterprise.includes('portal=${encodeURIComponent(roleKind)}'), 'attachment requests must declare client/admin portal context');
 must(attachment.includes("createHash('sha256'"), 'attachments must record SHA-256 integrity');
 must(attachment.includes('MAX_FILE_BYTES = 3 * 1024 * 1024'), 'attachment size limit must be enforced');
 must(attachment.includes('BLOB_READ_WRITE_TOKEN'), 'Blob read-write token must be supported explicitly');

@@ -66,7 +66,7 @@
       if (!allowed.includes(file.type)) throw new Error(`${file.name}: formato não permitido. Use JPG, PNG, WEBP ou PDF.`);
       if (file.size > 3 * 1024 * 1024) throw new Error(`${file.name}: o limite é 3 MB por arquivo.`);
       const dataBase64 = await fileToBase64(file);
-      const result = await api(`/api/attachment?action=upload&ticketId=${encodeURIComponent(ticketId)}`, {
+      const result = await api(`/api/attachment?action=upload&ticketId=${encodeURIComponent(ticketId)}&portal=${encodeURIComponent(roleKind)}`, {
         method:'POST',
         body: { messageId, fileName:file.name, contentType:file.type, dataBase64 }
       });
@@ -109,11 +109,18 @@
   }
   async function refreshAttachments() {
     try {
-      const data = await api(`/api/attachment?action=list&ticketId=${encodeURIComponent(ticketId)}`);
+      const data = await api(`/api/attachment?action=list&ticketId=${encodeURIComponent(ticketId)}&portal=${encodeURIComponent(roleKind)}`);
       attachments = data.attachments || [];
       decorateMessages();
+      let storageReady = data.storageConfigured !== false;
+      if (!storageReady) {
+        try {
+          const health = await api('/api/attachment?action=health');
+          storageReady = health?.storage?.connected === true;
+        } catch {}
+      }
       document.querySelectorAll('[data-attachment-storage-state]').forEach(el => {
-        el.hidden = data.storageConfigured !== false;
+        el.hidden = storageReady;
       });
       return attachments;
     } catch (error) {
