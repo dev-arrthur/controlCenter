@@ -1,5 +1,6 @@
 'use strict';
 
+require('dotenv').config();
 const crypto = require('crypto');
 const { Readable } = require('node:stream');
 const {
@@ -13,6 +14,9 @@ const {
 
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+const STORAGE_HEALTH_TTL_MS = 30 * 1000;
+
+if (!global.__ccBlobHealth) global.__ccBlobHealth = { checkedAt: 0, value: null };
 
 function json(res, status, payload) {
   res.status(status);
@@ -66,19 +70,56 @@ function blobAuthOptions() {
 function blobAuthMode() {
   if (String(process.env.BLOB_READ_WRITE_TOKEN || '').trim()) return 'read-write-token';
   if (String(process.env.VERCEL_OIDC_TOKEN || '').trim() && String(process.env.BLOB_STORE_ID || '').trim()) return 'oidc';
-  return 'not-configured';
+  return 'sdk-default';
 }
-function blobConfigured() { return blobAuthMode() !== 'not-configured'; }
-async function verifyBlobStorage() {
-  if (!blobConfigured()) return { configured: false, connected: false, authMode: 'not-configured' };
+function blobCredentialHintPresent() {
+  return Boolean(
+    String(process.env.BLOB_READ_WRITE_TOKEN || '').trim() ||
+    (String(process.env.VERCEL_OIDC_TOKEN || '').trim() && String(process.env.BLOB_STORE_ID || '').trim())
+  );
+}
+function isBlobAuthError(error) {
+  const text = `${error?.code || ''} ${error?.message || ''}`.toLowerCase();
+  return text.includes('blob_read_write_token') ||
+    text.includes('unauthorized') ||
+    text.includes('authentication') ||
+    text.includes('authorization') ||
+    text.includes('credential') ||
+    text.includes('token') ||
+    text.includes('store id') ||
+    text.includes('storeid');
+}
+async function verifyBlobStorage(force = false) {
+  const now = Date.now();
+  if (!force && global.__ccBlobHealth.value && now - global.__ccBlobHealth.checkedAt < STORAGE_HEALTH_TTL_MS) {
+    return global.__ccBlobHealth.value;
+  }
   try {
     const { list } = await import('@vercel/blob');
     await list({ limit: 1, ...blobAuthOptions() });
-    return { configured: true, connected: true, authMode: blobAuthMode() };
+    const value = {
+      configured: true,
+      connected: true,
+      authMode: blobAuthMode(),
+      credentialHintPresent: blobCredentialHintPresent()
+    };
+    global.__ccBlobHealth = { checkedAt: now, value };
+    return value;
   } catch (error) {
-    console.error('BLOB_HEALTH_ERROR', error?.message || error);
-    return { configured: true, connected: false, authMode: blobAuthMode() };
+    console.error('BLOB_HEALTH_ERROR', error?.code || '', error?.message || error);
+    const value = {
+      configured: false,
+      connected: false,
+      authMode: blobAuthMode(),
+      credentialHintPresent: blobCredentialHintPresent(),
+      errorCode: isBlobAuthError(error) ? 'BLOB_AUTH_UNAVAILABLE' : 'BLOB_UNAVAILABLE'
+    };
+    global.__ccBlobHealth = { checkedAt: now, value };
+    return value;
   }
+}
+function invalidateBlobHealth() {
+  global.__ccBlobHealth = { checkedAt: 0, value: null };
 }
 function publicAttachment(doc) {
   return {
@@ -106,7 +147,7 @@ async function archiveTicketAttachmentMetadata(db, ticketId) {
   for (const doc of active) {
     await db.collection('ticket_attachment_archive').replaceOne(
       { _id: doc._id },
-      { ...doc, archived: true, status: 'archived', archivedAt },
+      { ...doc, archived: true, status: 'archived', archivedAt, updatedAt: archivedAt },
       { upsert: true }
     );
   }
@@ -139,9 +180,10 @@ module.exports = async function handler(req, res) {
   try {
     const action = String(req.query.action || 'list').toLowerCase();
 
-    // Health operacional sem expor token, nomes de arquivos ou conteúdo do store.
+    // Health operacional: tenta o SDK de verdade. Não depende de inferir configuração
+    // apenas pelo nome de uma variável e não expõe token ou nomes de arquivos.
     if (action === 'health' && req.method === 'GET') {
-      const storage = await verifyBlobStorage();
+      const storage = await verifyBlobStorage(true);
       return ok(res, {
         service: 'controlcenter-attachments',
         storage: {
@@ -166,24 +208,24 @@ module.exports = async function handler(req, res) {
       const ticket = await authorizeTicket(session, req.query.ticketId);
       if (!ticket) return fail(res, 404, 'TICKET_NOT_FOUND', 'Chamado não encontrado.');
       if (ticket.status === 'fechado') await archiveTicketAttachmentMetadata(session.db, ticket._id);
-      const [active, archived] = await Promise.all([
+      const [active, archived, storage] = await Promise.all([
         session.db.collection('ticket_attachments').find({ ticketId: ticket._id }).sort({ createdAt: 1 }).toArray(),
-        session.db.collection('ticket_attachment_archive').find({ ticketId: ticket._id }).sort({ createdAt: 1 }).toArray()
+        session.db.collection('ticket_attachment_archive').find({ ticketId: ticket._id }).sort({ createdAt: 1 }).toArray(),
+        verifyBlobStorage(false)
       ]);
       const docs = [...active, ...archived]
         .filter(item => session.kind === 'admin' || item.internal !== true)
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       return ok(res, {
         attachments: docs.map(publicAttachment),
-        storageConfigured: blobConfigured(),
-        storageMode: blobAuthMode(),
+        storageConfigured: storage.connected === true,
+        storageMode: storage.authMode,
         counts: { active: active.length, archived: archived.length, total: docs.length }
       });
     }
 
     if (action === 'upload' && req.method === 'POST') {
       if (!sameOrigin(req)) return fail(res, 403, 'INVALID_ORIGIN', 'Origem não permitida.');
-      if (!blobConfigured()) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos ainda não foi configurado.');
       const uploadLimit = await rate(session, req, 'attachment-upload', 12, 10 * 60 * 1000);
       if (!uploadLimit.allowed) {
         res.setHeader('Retry-After', String(uploadLimit.retryAfter));
@@ -219,12 +261,15 @@ module.exports = async function handler(req, res) {
       let blob = null;
       let metadataPersisted = false;
       try {
+        // Sempre tentamos o SDK. Com token explícito, ele é passado nas opções;
+        // na Vercel o SDK também pode usar a autenticação disponibilizada pelo runtime.
         blob = await put(path, buffer, {
           access: 'private',
           contentType,
           addRandomSuffix: true,
           ...blobAuthOptions()
         });
+        invalidateBlobHealth();
 
         const now = new Date();
         const doc = {
@@ -249,7 +294,7 @@ module.exports = async function handler(req, res) {
           storageAccess: 'private',
           storageAuthMode: blobAuthMode(),
           retention: 'permanent-ticket-record',
-          recordVersion: 2,
+          recordVersion: 3,
           status: 'active',
           archived: false,
           createdAt: now,
@@ -283,13 +328,16 @@ module.exports = async function handler(req, res) {
         return ok(res, { attachment: publicAttachment(doc), persisted: true }, 201);
       } catch (error) {
         if (blob && !metadataPersisted) await cleanupOrphanBlob(blob);
-        console.error('ATTACHMENT_UPLOAD_PERSISTENCE_ERROR', error);
+        invalidateBlobHealth();
+        console.error('ATTACHMENT_UPLOAD_PERSISTENCE_ERROR', error?.code || '', error?.message || error);
+        if (!blob && isBlobAuthError(error)) {
+          return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos não está disponível neste ambiente.');
+        }
         return fail(res, 503, 'ATTACHMENT_PERSISTENCE_FAILED', 'Não foi possível armazenar o anexo com segurança. Tente novamente em instantes.');
       }
     }
 
     if (action === 'download' && req.method === 'GET') {
-      if (!blobConfigured()) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos ainda não foi configurado.');
       const id = ObjectId.isValid(req.query.id) ? new ObjectId(req.query.id) : null;
       if (!id) return fail(res, 400, 'INVALID_ATTACHMENT', 'Anexo inválido.');
       let attachment = await session.db.collection('ticket_attachments').findOne({ _id: id });
@@ -298,28 +346,35 @@ module.exports = async function handler(req, res) {
       const ticket = await authorizeTicket(session, String(attachment.ticketId));
       if (!ticket || (session.kind === 'client' && attachment.internal === true)) return fail(res, 404, 'ATTACHMENT_NOT_FOUND', 'Anexo não encontrado.');
 
-      const { get } = await import('@vercel/blob');
-      const result = await get(attachment.blobPathname, {
-        access: 'private',
-        ifNoneMatch: req.headers['if-none-match'] || undefined,
-        ...blobAuthOptions()
-      });
-      if (!result) return fail(res, 404, 'BLOB_NOT_FOUND', 'Arquivo não encontrado no armazenamento.');
-      if (result.statusCode === 304) {
-        res.status(304);
-        res.setHeader('ETag', result.blob.etag);
+      try {
+        const { get } = await import('@vercel/blob');
+        const result = await get(attachment.blobPathname, {
+          access: 'private',
+          ifNoneMatch: req.headers['if-none-match'] || undefined,
+          ...blobAuthOptions()
+        });
+        if (!result) return fail(res, 404, 'BLOB_NOT_FOUND', 'Arquivo não encontrado no armazenamento.');
+        if (result.statusCode === 304) {
+          res.status(304);
+          res.setHeader('ETag', result.blob.etag);
+          res.setHeader('Cache-Control', 'private, no-cache');
+          return res.end();
+        }
+        if (result.statusCode !== 200) return fail(res, 404, 'BLOB_NOT_FOUND', 'Arquivo não encontrado no armazenamento.');
+        const encodedName = encodeURIComponent(attachment.originalFileName || attachment.fileName).replace(/'/g, '%27');
+        res.status(200);
+        res.setHeader('Content-Type', result.blob.contentType || attachment.contentType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodedName}`);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Cache-Control', 'private, no-cache');
-        return res.end();
+        res.setHeader('ETag', result.blob.etag);
+        return Readable.fromWeb(result.stream).pipe(res);
+      } catch (error) {
+        invalidateBlobHealth();
+        console.error('ATTACHMENT_DOWNLOAD_BLOB_ERROR', error?.code || '', error?.message || error);
+        if (isBlobAuthError(error)) return fail(res, 503, 'ATTACHMENT_STORAGE_NOT_CONFIGURED', 'O armazenamento privado de anexos não está disponível neste ambiente.');
+        return fail(res, 503, 'ATTACHMENT_DOWNLOAD_FAILED', 'Não foi possível recuperar o anexo agora.');
       }
-      if (result.statusCode !== 200) return fail(res, 404, 'BLOB_NOT_FOUND', 'Arquivo não encontrado no armazenamento.');
-      const encodedName = encodeURIComponent(attachment.originalFileName || attachment.fileName).replace(/'/g, '%27');
-      res.status(200);
-      res.setHeader('Content-Type', result.blob.contentType || attachment.contentType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodedName}`);
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Cache-Control', 'private, no-cache');
-      res.setHeader('ETag', result.blob.etag);
-      return Readable.fromWeb(result.stream).pipe(res);
     }
 
     return fail(res, 404, 'NOT_FOUND', 'Rota de anexo não encontrada.');
