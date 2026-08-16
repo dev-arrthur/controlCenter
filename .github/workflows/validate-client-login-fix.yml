@@ -1,0 +1,30 @@
+name: Validate client login fix
+
+on:
+  push:
+    branches:
+      - fix/client-login-401
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: node --check workspace/client/assets/js/portal.js
+      - run: node --check scripts/seed-dev-users.js
+      - name: Validate client login contract
+        run: |
+          grep -q "role: 'client'" scripts/seed-dev-users.js
+          grep -q "initial-access-users-v2-client-login-repair" scripts/seed-dev-users.js
+          ! grep -q "organizationCode" workspace/client/assets/js/portal.js
+          ! grep -q "organizationCode" workspace/client/loginClient.html
+          grep -q '"buildCommand": "node scripts/seed-dev-users.js && node scripts/check-project.js"' vercel.json
