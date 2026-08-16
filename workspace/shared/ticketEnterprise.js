@@ -80,14 +80,77 @@
   function attachmentMarkup(item) {
     const image = item.contentType?.startsWith('image/');
     if (image) {
-      return `<a class="attachment-preview" href="${escapeHtml(item.downloadUrl)}" target="_blank" rel="noopener" title="Abrir ${escapeHtml(item.fileName)}">
+      return `<button class="attachment-preview attachment-image-open" type="button" data-image-preview="1" data-image-src="${escapeHtml(item.downloadUrl)}" data-image-name="${escapeHtml(item.fileName)}" data-image-size="${escapeHtml(formatBytes(item.size))}" title="Visualizar ${escapeHtml(item.fileName)}">
         <img src="${escapeHtml(item.downloadUrl)}" alt="${escapeHtml(item.fileName)}" loading="lazy">
-        <span><strong>${escapeHtml(item.fileName)}</strong><small>${formatBytes(item.size)} • ver original</small></span>
-      </a>`;
+        <span><strong>${escapeHtml(item.fileName)}</strong><small>${formatBytes(item.size)}</small></span>
+        <i class="bi bi-arrows-fullscreen attachment-preview-open-icon" aria-hidden="true"></i>
+      </button>`;
     }
     return `<a class="attachment-file" href="${escapeHtml(item.downloadUrl)}" target="_blank" rel="noopener">
       <i class="bi bi-file-earmark-pdf"></i><span><strong>${escapeHtml(item.fileName)}</strong><small>${formatBytes(item.size)} • PDF</small></span><i class="bi bi-box-arrow-up-right"></i>
     </a>`;
+  }
+
+  function ensureImageModal() {
+    let modal = document.getElementById('attachmentImageModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'attachmentImageModal';
+    modal.className = 'attachment-image-modal';
+    modal.hidden = true;
+    modal.innerHTML = `<div class="attachment-image-modal-backdrop" data-image-modal-close></div>
+      <div class="attachment-image-modal-card" role="dialog" aria-modal="true" aria-labelledby="attachmentImageModalTitle">
+        <div class="attachment-image-modal-head">
+          <div><small>ANEXO DO CHAMADO</small><strong id="attachmentImageModalTitle">Imagem</strong><span id="attachmentImageModalSize"></span></div>
+          <button type="button" class="attachment-image-modal-close" data-image-modal-close aria-label="Fechar imagem"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="attachment-image-modal-body"><img id="attachmentImageModalPreview" alt=""></div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => {
+      if (event.target.closest('[data-image-modal-close]')) closeImageModal();
+    });
+    return modal;
+  }
+  function openImageModal(trigger) {
+    const modal = ensureImageModal();
+    const image = modal.querySelector('#attachmentImageModalPreview');
+    const title = modal.querySelector('#attachmentImageModalTitle');
+    const size = modal.querySelector('#attachmentImageModalSize');
+    const src = trigger.dataset.imageSrc || '';
+    const name = trigger.dataset.imageName || 'Imagem';
+    image.src = src;
+    image.alt = name;
+    title.textContent = name;
+    size.textContent = trigger.dataset.imageSize || '';
+    modal.hidden = false;
+    requestAnimationFrame(() => modal.classList.add('open'));
+    document.body.classList.add('attachment-modal-open');
+    modal.querySelector('.attachment-image-modal-close')?.focus();
+  }
+  function closeImageModal() {
+    const modal = document.getElementById('attachmentImageModal');
+    if (!modal || modal.hidden) return;
+    modal.classList.remove('open');
+    document.body.classList.remove('attachment-modal-open');
+    setTimeout(() => {
+      modal.hidden = true;
+      const image = modal.querySelector('#attachmentImageModalPreview');
+      if (image) image.src = '';
+    }, 180);
+  }
+  function bindImageModal() {
+    if (document.documentElement.dataset.attachmentModalBound === '1') return;
+    document.documentElement.dataset.attachmentModalBound = '1';
+    document.addEventListener('click', event => {
+      const trigger = event.target.closest('[data-image-preview="1"]');
+      if (!trigger) return;
+      event.preventDefault();
+      openImageModal(trigger);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeImageModal();
+    });
   }
   function attachmentSignature(items) {
     return items.map(item => `${item.id}:${item.sha256 || ''}:${item.archived ? '1' : '0'}`).join('|');
@@ -210,6 +273,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     bindAttachmentInputs();
+    bindImageModal();
     refreshAttachments();
     connectRealtime();
   });
