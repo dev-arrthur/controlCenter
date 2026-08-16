@@ -200,7 +200,7 @@
   function renderAdminMessages(messages) {
     const wrap = $('#messages');
     if (!wrap) return;
-    wrap.innerHTML = messages.map(msg => `<div class="message ${msg.authorType === 'admin' ? 'admin-message' : 'client'} ${msg.internal ? 'internal-message' : ''}">
+    wrap.innerHTML = messages.map(msg => `<div class="message ${msg.authorType === 'admin' ? 'admin-message' : 'client'} ${msg.internal ? 'internal-message' : ''}" data-message-id="${escapeHtml(msg.id)}">
       <div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div>
       <div class="message-bubble">
         <div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${msg.internal ? 'Nota interna • ' : ''}${fmtDate(msg.createdAt, true)}</span></div>
@@ -237,14 +237,17 @@
       $('#statusControl').value = ticket.status;
       $('#priorityControl').value = ticket.priority;
       $('#assigneeControl').value = ticket.assignedTo || '';
+      if (window.CCAttachments) await window.CCAttachments.refresh();
       return ticket;
     };
     await refresh();
+    window.CCRefreshTicket = refresh;
+    window.dispatchEvent(new CustomEvent('cc:ticket-ready', { detail: { id } }));
 
     $('#saveTicketControls')?.addEventListener('click', async () => {
       const button = $('#saveTicketControls'); button.disabled = true;
       try {
-        await CCAdminApi.updateTicket(id, { status: $('#statusControl').value, priority: $('#priorityControl').value, assignedTo: $('#assigneeControl').value || null });
+        await CCAdminApi.updateTicket(id, { status: $('#statusControl').value, priority: $('#priorityControl').value });
         toast('Chamado atualizado.'); await refresh();
       } catch (error) { toast(error.message, 'error'); }
       finally { button.disabled = false; }
@@ -252,14 +255,32 @@
     $('#replyForm')?.addEventListener('submit', async event => {
       event.preventDefault(); const message = $('#replyMessage').value.trim(); if (!message) return;
       const button = $('#sendReply'); button.disabled = true;
-      try { await CCAdminApi.sendMessage(id, { message, internal:false }); $('#replyMessage').value = ''; toast('Resposta enviada ao cliente.'); await refresh(); }
+      try {
+        const sent = await CCAdminApi.sendMessage(id, { message, internal:false });
+        $('#replyMessage').value = '';
+        if (window.CCAttachments) {
+          try { await window.CCAttachments.uploadFiles({ messageId: sent.message.id, input: $('#replyAttachments') }); }
+          catch (uploadError) { toast(`Resposta enviada, mas o anexo falhou: ${uploadError.message}`, 'error'); }
+        }
+        toast('Resposta enviada ao cliente.');
+        await refresh();
+      }
       catch (error) { toast(error.message, 'error'); }
       finally { button.disabled = false; }
     });
     $('#internalNoteForm')?.addEventListener('submit', async event => {
       event.preventDefault(); const message = $('#internalNote').value.trim(); if (!message) return;
       const button = $('#sendInternalNote'); button.disabled = true;
-      try { await CCAdminApi.sendMessage(id, { message, internal:true }); $('#internalNote').value = ''; toast('Nota interna adicionada.'); await refresh(); }
+      try {
+        const sent = await CCAdminApi.sendMessage(id, { message, internal:true });
+        $('#internalNote').value = '';
+        if (window.CCAttachments) {
+          try { await window.CCAttachments.uploadFiles({ messageId: sent.message.id, input: $('#internalNoteAttachments') }); }
+          catch (uploadError) { toast(`Nota salva, mas o anexo falhou: ${uploadError.message}`, 'error'); }
+        }
+        toast('Nota interna adicionada.');
+        await refresh();
+      }
       catch (error) { toast(error.message, 'error'); }
       finally { button.disabled = false; }
     });

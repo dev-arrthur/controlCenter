@@ -27,6 +27,7 @@
       error.code = payload?.error?.code || `HTTP_${response.status}`;
       error.details = payload?.error?.details;
       error.status = response.status;
+      if (response.headers.get('Retry-After')) error.retryAfter = Number(response.headers.get('Retry-After'));
       throw error;
     }
     return payload;
@@ -43,12 +44,16 @@
     ticket: id => request(`/api/portal?action=admin-ticket&id=${encodeURIComponent(id)}`),
     updateTicket: (id, body) => request(`/api/portal?action=admin-ticket&id=${encodeURIComponent(id)}`, { method: 'PATCH', body }),
     sendMessage: (id, body) => request(`/api/portal?action=admin-message&id=${encodeURIComponent(id)}`, { method: 'POST', body }),
+    transferHistory: id => request(`/api/admin-enterprise?action=transfer&id=${encodeURIComponent(id)}`),
+    transferTicket: (id, body) => request(`/api/admin-enterprise?action=transfer&id=${encodeURIComponent(id)}`, { method: 'POST', body }),
     clients: params => request(`/api/portal?action=admin-clients&${new URLSearchParams(params || {}).toString()}`),
     createClient: body => request('/api/portal?action=admin-clients', { method: 'POST', body }),
     updateClient: (id, body) => request(`/api/portal?action=admin-clients&id=${encodeURIComponent(id)}`, { method: 'PATCH', body }),
     users: organizationId => request(`/api/portal?action=admin-users&organizationId=${encodeURIComponent(organizationId)}`),
     createUser: body => request('/api/portal?action=admin-users', { method: 'POST', body }),
     updateUser: (id, body) => request(`/api/portal?action=admin-users&id=${encodeURIComponent(id)}`, { method: 'PATCH', body }),
-    team: () => request('/api/portal?action=admin-team')
+    team: () => request('/api/admin-enterprise?action=team'),
+    createTeamMember: body => request('/api/admin-enterprise?action=team', { method: 'POST', body }),
+    updateTeamMember: (id, body) => request(`/api/admin-enterprise?action=team&id=${encodeURIComponent(id)}`, { method: 'PATCH', body })
   };
 })(window);

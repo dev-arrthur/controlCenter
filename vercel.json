@@ -2,11 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "functions": {
-    "api/portal.js": {
-      "maxDuration": 10
-    }
+    "api/portal.js": { "maxDuration": 15 },
+    "api/gateway.js": { "maxDuration": 15 },
+    "api/admin-enterprise.js": { "maxDuration": 15 },
+    "api/attachment.js": { "maxDuration": 30 },
+    "api/socket.js": { "maxDuration": 300 }
   },
   "rewrites": [
+    { "source": "/api/portal", "destination": "/api/gateway" },
     { "source": "/cliente", "destination": "/workspace/client/loginClient.html" },
     { "source": "/portal", "destination": "/workspace/client/loginClient.html" }
   ],
