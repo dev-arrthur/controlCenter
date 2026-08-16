@@ -61,8 +61,6 @@
   }
 
   async function initLogin() {
-    // Não consulta /me na tela de login: usuário sem sessão é um estado normal
-    // e não deve gerar 401 desnecessário no console antes da autenticação.
     const params=new URLSearchParams(location.search);
     if(params.get('expired')) { const alert=$('#loginAlert'); if(alert){alert.textContent='Sua sessão expirou. Entre novamente para continuar.';alert.classList.add('show')} }
     $('#togglePassword')?.addEventListener('click',()=>{const input=$('#password');input.type=input.type==='password'?'text':'password';$('#togglePassword i').className=`bi ${input.type==='password'?'bi-eye':'bi-eye-slash'}`});
@@ -135,7 +133,7 @@
 
   function renderMessages(messages) {
     const wrap=$('#messages');
-    wrap.innerHTML=messages.map(msg=>`<div class="message ${msg.authorType==='client'?'client':''}"><div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div><div class="message-bubble"><div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${date(msg.createdAt,true)}</span></div><p>${escapeHtml(msg.message)}</p></div></div>`).join('');
+    wrap.innerHTML=messages.map(msg=>`<div class="message ${msg.authorType==='client'?'client':''}" data-message-id="${escapeHtml(msg.id)}"><div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div><div class="message-bubble"><div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${date(msg.createdAt,true)}</span></div><p>${escapeHtml(msg.message)}</p></div></div>`).join('');
     wrap.scrollTop=wrap.scrollHeight;
   }
 
@@ -147,10 +145,20 @@
       $('#ticketTitle').textContent=t.title;$('#ticketNumber').textContent=t.ticketNumber;$('#ticketStatus').innerHTML=statusPill(t.status);$('#ticketPriority').innerHTML=priorityPill(t.priority);$('#ticketCategory').textContent=CATEGORY_LABELS[t.category]||t.category;$('#ticketCreated').textContent=date(t.createdAt,true);$('#ticketUpdated').textContent=date(t.updatedAt,true);
       renderMessages(data.messages);
       const isClosed=t.status==='fechado';$('#replySection')?.classList.toggle('hidden',isClosed);$('#closeTicket')?.classList.toggle('hidden',isClosed);$('#reopenTicket')?.classList.toggle('hidden',!['fechado','resolvido'].includes(t.status));
+      if(window.CCAttachments) await window.CCAttachments.refresh();
       return t;
     };
     await refresh();
-    $('#replyForm')?.addEventListener('submit',async e=>{e.preventDefault();const textarea=$('#replyMessage');const msg=textarea.value.trim();if(!msg)return;const btn=$('#sendReply');btn.disabled=true;try{await CCApi.sendMessage(id,msg);textarea.value='';await refresh()}catch(error){toast(error.message,'error')}finally{btn.disabled=false}});
+    window.CCRefreshTicket=refresh;
+    window.dispatchEvent(new CustomEvent('cc:ticket-ready',{detail:{id}}));
+    $('#replyForm')?.addEventListener('submit',async e=>{
+      e.preventDefault();const textarea=$('#replyMessage');const msg=textarea.value.trim();if(!msg)return;const btn=$('#sendReply');btn.disabled=true;
+      try{
+        const sent=await CCApi.sendMessage(id,msg);textarea.value='';
+        if(window.CCAttachments){try{await window.CCAttachments.uploadFiles({messageId:sent.message.id,input:$('#replyAttachments')});}catch(uploadError){toast(`Mensagem enviada, mas o anexo falhou: ${uploadError.message}`,'error');}}
+        await refresh();
+      }catch(error){toast(error.message,'error')}finally{btn.disabled=false}
+    });
     $('#closeTicket')?.addEventListener('click',async()=>{if(!confirm('Deseja encerrar este chamado?'))return;try{await CCApi.ticketAction(id,'close');toast('Chamado encerrado.');await refresh()}catch(error){toast(error.message,'error')}});
     $('#reopenTicket')?.addEventListener('click',async()=>{try{await CCApi.ticketAction(id,'reopen');toast('Chamado reaberto.');await refresh()}catch(error){toast(error.message,'error')}});
   }
