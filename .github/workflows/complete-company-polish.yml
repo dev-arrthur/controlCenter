@@ -1,0 +1,676 @@
+name: Complete company polish
+
+on:
+  push:
+    paths:
+      - '.github/workflows/complete-company-polish.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Polish company, navbar and footers
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+
+          navbar_css = r'''@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --blue: #174f82;
+    --blue-dark: #0e385f;
+    --blue-medium: #296998;
+    --blue-light: #eaf3fa;
+    --border: #e6e6e6;
+    --gray: #6b6b6b;
+    --max-width: 1380px;
+}
+
+body.menu-open { overflow: hidden; }
+
+.scroll-progress {
+    width: 0;
+    height: 2px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    background: var(--blue);
+    pointer-events: none;
+}
+
+.navbar {
+    height: 88px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(255,255,255,.94);
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: height .25s ease, box-shadow .25s ease, background .25s ease;
+}
+
+.navbar.scrolled {
+    height: 76px;
+    background: rgba(255,255,255,.985);
+    box-shadow: 0 15px 45px rgba(0,0,0,.055);
+}
+
+.navbar .container {
+    width: min(calc(100% - 80px), var(--max-width));
+    margin-inline: auto;
+}
+
+.navbar-inner {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 240px 1fr auto;
+    align-items: center;
+    gap: 35px;
+}
+
+.brand-logo {
+    width: fit-content;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.brand-logo img {
+    width: auto;
+    height: 49px;
+    object-fit: contain;
+    transition: transform .25s ease, opacity .25s ease;
+}
+
+.brand-logo:hover img { opacity: .86; transform: translateY(-1px); }
+
+.nav { justify-self: center; }
+.nav-links { display: flex; align-items: center; gap: 31px; list-style: none; margin: 0; padding: 0; }
+.nav-links > li > a {
+    min-height: 88px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #151515;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color .2s ease, min-height .25s ease;
+}
+.navbar.scrolled .nav-links > li > a { min-height: 76px; }
+.nav-links > li > a::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 100%;
+    bottom: 21px;
+    height: 2px;
+    background: var(--blue);
+    transition: right .25s ease;
+}
+.nav-links > li > a:hover,
+.nav-links > li > a.active { color: var(--blue); }
+.nav-links > li > a:hover::after,
+.nav-links > li > a.active::after { right: 0; }
+.nav-links i { font-size: 10px; }
+
+.navbar-actions { display: flex; align-items: center; gap: 10px; justify-self: end; }
+.navbar-actions .btn {
+    min-height: 47px;
+    padding: 0 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform .25s ease, color .25s ease, background .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+.navbar-actions .btn:hover { transform: translateY(-2px); }
+.navbar-actions .btn-primary { color: #fff; background: var(--blue); }
+.navbar-actions .btn-primary:hover { background: var(--blue-dark); box-shadow: 0 12px 28px rgba(23,79,130,.18); }
+.navbar-actions .btn-outline { color: #111; background: transparent; border-color: #cecece; }
+.navbar-actions .btn-outline:hover { border-color: #111; }
+
+.mega-wrapper { position: static; }
+.mega-menu {
+    position: absolute;
+    top: 88px;
+    left: 0;
+    right: 0;
+    padding: 47px 0;
+    background: #fff;
+    border-top: 1px solid #efefef;
+    border-bottom: 1px solid #e9e9e9;
+    box-shadow: 0 30px 55px rgba(0,0,0,.06);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity .2s ease, visibility .2s ease, transform .2s ease, top .25s ease;
+}
+.navbar.scrolled .mega-menu { top: 76px; }
+.mega-wrapper:hover .mega-menu,
+.mega-wrapper:focus-within .mega-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+.mega-menu .container { width: min(calc(100% - 80px), var(--max-width)); margin-inline: auto; }
+.mega-grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr; gap: 50px; }
+.mega-intro { padding-right: 40px; }
+.mega-label { display: block; margin-bottom: 15px; color: var(--blue); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+.mega-intro h3 { margin: 0 0 17px; font-size: 29px; font-weight: 600; line-height: 1.18; letter-spacing: -.04em; }
+.mega-intro p { margin: 0; color: var(--gray); font-size: 13px; line-height: 1.7; }
+.mega-col h4 { margin: 0 0 20px; color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+.mega-col a { display: flex; align-items: center; gap: 11px; padding: 9px 0; color: #151515; font-size: 13px; font-weight: 500; text-decoration: none; transition: color .2s ease, transform .2s ease; }
+.mega-col a i { width: 19px; color: var(--blue); font-size: 15px; }
+.mega-col a:hover { color: var(--blue); transform: translateX(3px); }
+
+.menu-button {
+    width: 45px;
+    height: 45px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    color: #111;
+    background: transparent;
+    font-size: 25px;
+}
+
+.mobile-menu {
+    position: fixed;
+    top: 72px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+    padding: 25px 22px 40px;
+    background: #fff;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform .35s cubic-bezier(.2,.65,.3,1);
+}
+.mobile-menu.active { transform: translateX(0); }
+.mobile-menu > a {
+    padding: 19px 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #ededed;
+    color: #111;
+    font-size: 23px;
+    font-weight: 600;
+    letter-spacing: -.04em;
+    text-decoration: none;
+}
+.mobile-menu > a i { color: var(--blue); font-size: 17px; }
+.mobile-client { margin-top: 30px; justify-content: center !important; color: #fff !important; background: var(--blue); border: 0 !important; font-size: 14px !important; }
+.mobile-client i { color: #fff !important; }
+
+@media (max-width: 1200px) {
+    .navbar .container, .mega-menu .container { width: min(calc(100% - 50px), var(--max-width)); }
+    .navbar-inner { display: flex; justify-content: space-between; }
+    .nav { display: none; }
+    .menu-button { display: flex; }
+    .navbar-actions .btn-outline { display: none; }
+}
+
+@media (max-width: 850px) {
+    .navbar, .navbar.scrolled { height: 72px; }
+    .brand-logo img { height: 40px; }
+    .navbar-actions .btn-primary { display: none; }
+}
+
+@media (max-width: 600px) {
+    .navbar .container { width: calc(100% - 32px); }
+    .brand-logo img { height: 35px; }
+}
+'''
+          (root / 'pages/solutions/navbar.css').write_text(navbar_css, encoding='utf-8')
+
+          company_css = r'''@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --company-blue: #174f82;
+    --company-blue-dark: #0e385f;
+    --company-blue-medium: #296998;
+    --company-blue-light: #eaf3fa;
+    --company-ink: #101214;
+    --company-muted: #66717b;
+    --company-soft: #f6f8fa;
+    --company-border: #e4e8ec;
+    --company-white: #ffffff;
+    --company-max: 1380px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body.company-page {
+    margin: 0;
+    font-family: 'Inter', Arial, sans-serif;
+    color: var(--company-ink);
+    background: #fff;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+body.company-page img { display: block; max-width: 100%; }
+body.company-page a { color: inherit; text-decoration: none; }
+body.company-page .container { width: min(calc(100% - 80px), var(--company-max)); margin-inline: auto; }
+body.company-page .navbar .container,
+body.company-page .mega-menu .container { width: min(calc(100% - 80px), 1380px); }
+body.company-page .nav-links > li > a.active { color: var(--company-blue); }
+body.company-page .nav-links > li > a.active::after { right: 0; }
+
+.company-hero {
+    min-height: 820px;
+    padding: 165px 0 100px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: linear-gradient(180deg, #fff 0%, #fbfdff 62%, #f7fafc 100%);
+}
+.company-hero::before,
+.company-hero::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: -1;
+}
+.company-hero::before {
+    width: 720px;
+    height: 720px;
+    right: -280px;
+    top: 80px;
+    border: 1px solid rgba(23,79,130,.09);
+}
+.company-hero::after {
+    width: 440px;
+    height: 440px;
+    right: 7%;
+    top: 190px;
+    background: radial-gradient(circle, rgba(23,79,130,.09), rgba(23,79,130,0) 68%);
+    filter: blur(6px);
+}
+.company-hero-grid { display: grid; grid-template-columns: .92fr 1.08fr; align-items: center; gap: 86px; }
+.company-kicker,
+.company-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--company-blue);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+}
+.company-kicker::before,
+.company-eyebrow::before { content: ''; width: 25px; height: 2px; background: currentColor; }
+.company-hero h1 { max-width: 760px; margin: 24px 0 0; font-size: clamp(58px, 6.2vw, 94px); line-height: .96; font-weight: 600; letter-spacing: -.065em; }
+.company-hero h1 span { color: var(--company-blue); }
+.company-hero-copy > p { max-width: 690px; margin: 30px 0 0; color: var(--company-muted); font-size: 17px; line-height: 1.8; }
+.company-hero-actions { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 12px; }
+.company-hero-actions .btn { min-height: 56px; padding: 0 26px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid #ccd4db; font-size: 13px; font-weight: 700; transition: .25s ease; }
+.company-hero-actions .btn:hover { transform: translateY(-2px); }
+.company-hero-actions .btn-primary { color: #fff; background: var(--company-blue); border-color: var(--company-blue); box-shadow: 0 16px 34px rgba(23,79,130,.14); }
+.company-hero-actions .btn-primary:hover { background: var(--company-blue-dark); box-shadow: 0 20px 38px rgba(23,79,130,.2); }
+.company-hero-actions .btn-outline { color: #111; background: rgba(255,255,255,.65); }
+.company-hero-actions .btn-outline:hover { border-color: #111; background: #fff; }
+.company-visual { min-height: 570px; display: flex; align-items: center; justify-content: center; position: relative; }
+.company-visual::before { content: ''; width: 76%; aspect-ratio: 1; position: absolute; border-radius: 50%; background: rgba(23,79,130,.05); }
+.company-visual::after { content: ''; width: 62%; height: 28px; position: absolute; bottom: 35px; border-radius: 50%; background: rgba(23,79,130,.10); filter: blur(22px); }
+.company-visual img { width: min(720px, 100%); position: relative; z-index: 2; object-fit: contain; filter: drop-shadow(0 30px 32px rgba(23,79,130,.10)); }
+
+.company-numbers { color: #fff; background: #101214; }
+.company-numbers-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+.company-number { min-height: 255px; padding: 44px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; border-right: 1px solid rgba(255,255,255,.10); }
+.company-number:last-child { border-right: 0; }
+.company-number::after { content: ''; width: 0; height: 2px; position: absolute; left: 0; bottom: 0; background: #729bbb; transition: width .35s ease; }
+.company-number:hover::after { width: 100%; }
+.company-number i { color: #79a5c7; font-size: 24px; }
+.company-number strong { display: block; font-size: clamp(48px, 5vw, 76px); line-height: 1; font-weight: 500; letter-spacing: -.065em; }
+.company-number span { color: #8d959c; font-size: 12px; line-height: 1.55; }
+
+.company-section { padding: 120px 0; }
+.company-section.soft { background: var(--company-soft); }
+.company-section-head { max-width: 940px; margin-bottom: 64px; }
+.company-section h2 { margin: 21px 0 0; font-size: clamp(42px, 5vw, 72px); line-height: 1.02; font-weight: 600; letter-spacing: -.055em; }
+.company-section-head > p,
+.company-copy p { max-width: 760px; margin: 25px 0 0; color: var(--company-muted); font-size: 16px; line-height: 1.78; }
+
+.company-story-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 90px; align-items: start; }
+.company-story-title { position: sticky; top: 125px; }
+.company-story-content { border-top: 1px solid var(--company-border); }
+.company-story-block { padding: 32px 0; display: grid; grid-template-columns: 54px 1fr; gap: 22px; border-bottom: 1px solid var(--company-border); }
+.company-story-icon { width: 50px; height: 50px; display: grid; place-items: center; color: var(--company-blue); border: 1px solid #cfd8df; background: #fff; font-size: 20px; transition: .25s ease; }
+.company-story-block:hover .company-story-icon { color: #fff; background: var(--company-blue); border-color: var(--company-blue); transform: translateY(-2px); }
+.company-story-block h3 { margin: 0; font-size: 21px; letter-spacing: -.035em; }
+.company-story-block p { margin: 9px 0 0; color: var(--company-muted); font-size: 14px; line-height: 1.72; }
+
+.company-pillars { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--company-border); border-left: 1px solid var(--company-border); }
+.company-pillar { min-height: 345px; padding: 34px; position: relative; overflow: hidden; background: #fff; border-right: 1px solid var(--company-border); border-bottom: 1px solid var(--company-border); transition: transform .3s ease, background .3s ease, color .3s ease, box-shadow .3s ease; }
+.company-pillar:hover { color: #fff; background: var(--company-blue); transform: translateY(-5px); box-shadow: 0 22px 45px rgba(23,79,130,.14); }
+.company-pillar .num { color: #9aa1a7; font-size: 10px; font-weight: 700; }
+.company-pillar i { width: 60px; height: 60px; margin: 55px 0 30px; display: grid; place-items: center; color: var(--company-blue); border: 1px solid #d6dce1; font-size: 24px; transition: .3s ease; }
+.company-pillar:hover i { color: #fff; border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.08); }
+.company-pillar h3 { margin: 0; font-size: 22px; letter-spacing: -.035em; }
+.company-pillar p { margin: 13px 0 0; color: var(--company-muted); font-size: 13px; line-height: 1.7; transition: color .3s ease; }
+.company-pillar:hover p { color: rgba(255,255,255,.76); }
+
+.company-method { color: #fff; background: var(--company-blue); position: relative; overflow: hidden; }
+.company-method::before,
+.company-method::after { content: ''; position: absolute; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; }
+.company-method::before { width: 720px; height: 720px; right: -330px; top: -360px; }
+.company-method::after { width: 430px; height: 430px; right: -120px; top: -210px; }
+.company-method .company-eyebrow { color: #fff; }
+.company-method h2 { max-width: 980px; position: relative; z-index: 2; }
+.company-method-grid { margin-top: 66px; display: grid; grid-template-columns: repeat(4, 1fr); position: relative; z-index: 2; border-top: 1px solid rgba(255,255,255,.2); border-bottom: 1px solid rgba(255,255,255,.12); }
+.company-method-step { min-height: 290px; padding: 32px 30px; border-right: 1px solid rgba(255,255,255,.16); }
+.company-method-step:last-child { border-right: 0; }
+.company-method-step .step { color: #9fc4df; font-size: 11px; font-weight: 700; }
+.company-method-step h3 { margin: 80px 0 0; font-size: 22px; letter-spacing: -.035em; }
+.company-method-step p { margin: 12px 0 0; color: rgba(255,255,255,.70); font-size: 13px; line-height: 1.7; }
+
+.company-solutions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.company-solution-link { min-height: 94px; padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid var(--company-border); background: #fff; font-size: 14px; font-weight: 600; transition: .25s ease; }
+.company-solution-link span { display: flex; align-items: center; gap: 13px; }
+.company-solution-link span i { color: var(--company-blue); font-size: 18px; }
+.company-solution-link > i { color: #89949c; transition: transform .25s ease; }
+.company-solution-link:hover { color: var(--company-blue); border-color: var(--company-blue); transform: translateY(-2px); box-shadow: 0 16px 35px rgba(23,79,130,.07); }
+.company-solution-link:hover > i { transform: translateX(4px); }
+
+.company-commitment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+.company-quote { padding: 54px; background: #101214; color: #fff; box-shadow: 0 28px 60px rgba(0,0,0,.08); }
+.company-quote i { color: #6f9abb; font-size: 34px; }
+.company-quote blockquote { margin: 32px 0 0; font-size: clamp(28px, 3vw, 46px); line-height: 1.08; letter-spacing: -.045em; font-weight: 500; }
+.company-quote p { margin: 27px 0 0; color: #8d969d; font-size: 13px; line-height: 1.7; }
+.company-values { display: grid; gap: 18px; }
+.company-value { padding: 20px 0; display: grid; grid-template-columns: 42px 1fr; gap: 15px; border-bottom: 1px solid var(--company-border); }
+.company-value i { color: var(--company-blue); font-size: 20px; }
+.company-value strong { display: block; font-size: 14px; }
+.company-value span { display: block; margin-top: 5px; color: var(--company-muted); font-size: 13px; line-height: 1.6; }
+
+.company-cta { padding: 94px 0; color: #fff; background: #0f1113; position: relative; overflow: hidden; }
+.company-cta::after { content: ''; width: 520px; height: 520px; position: absolute; right: -190px; top: -260px; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; }
+.company-cta-grid { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 60px; position: relative; z-index: 2; }
+.company-cta h2 { max-width: 900px; margin: 0; font-size: clamp(42px, 5vw, 70px); line-height: 1; letter-spacing: -.055em; font-weight: 600; }
+.company-cta p { max-width: 720px; margin: 20px 0 0; color: #8d969d; font-size: 15px; line-height: 1.7; }
+.company-cta .btn { min-height: 56px; padding: 0 24px; display: inline-flex; align-items: center; gap: 9px; color: #111; background: #fff; border: 1px solid #fff; font-size: 13px; font-weight: 700; transition: .25s ease; }
+.company-cta .btn:hover { transform: translateY(-2px); background: #f1f5f8; }
+
+.company-footer { padding: 76px 0 26px; color: #fff; background: #080a0c; }
+.company-footer-grid { display: grid; grid-template-columns: 1.45fr repeat(4, 1fr); gap: 46px; }
+.company-footer-brand { padding-right: 30px; }
+.company-footer-brand img { height: 50px; width: auto; }
+.company-footer-brand p { max-width: 350px; margin: 20px 0 0; color: #6f767c; font-size: 12px; line-height: 1.75; }
+.company-footer h4 { margin: 0 0 18px; color: #5f676e; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.company-footer a { width: fit-content; display: block; margin: 11px 0; color: #a2a9af; font-size: 12px; transition: color .2s ease, transform .2s ease; }
+.company-footer a:hover { color: #fff; transform: translateX(3px); }
+.company-footer-bottom { margin-top: 58px; padding-top: 22px; display: flex; justify-content: space-between; align-items: center; gap: 25px; border-top: 1px solid #20252a; color: #596168; font-size: 10px; }
+.company-footer-bottom a { margin: 0; }
+
+@media (max-width: 1200px) {
+    body.company-page .container,
+    body.company-page .navbar .container,
+    body.company-page .mega-menu .container { width: min(calc(100% - 50px), var(--company-max)); }
+    .company-hero { min-height: auto; padding: 145px 0 90px; }
+    .company-hero-grid,
+    .company-story-grid,
+    .company-commitment-grid { grid-template-columns: 1fr; }
+    .company-visual { min-height: 500px; }
+    .company-story-title { position: static; }
+    .company-pillars,
+    .company-method-grid { grid-template-columns: repeat(2, 1fr); }
+    .company-method-step:nth-child(2) { border-right: 0; }
+    .company-method-step:nth-child(-n+2) { border-bottom: 1px solid rgba(255,255,255,.16); }
+    .company-solutions-grid { grid-template-columns: repeat(2, 1fr); }
+    .company-footer-grid { grid-template-columns: 1.4fr repeat(2, 1fr); }
+    .company-footer-brand { grid-row: span 2; }
+}
+
+@media (max-width: 850px) {
+    .company-hero { padding: 125px 0 78px; }
+    .company-hero h1 { font-size: clamp(52px, 12vw, 78px); }
+    .company-visual { min-height: 430px; }
+    .company-numbers-grid { grid-template-columns: repeat(2, 1fr); }
+    .company-number:nth-child(2) { border-right: 0; }
+    .company-number:nth-child(-n+2) { border-bottom: 1px solid rgba(255,255,255,.10); }
+    .company-section { padding: 90px 0; }
+    .company-solutions-grid { grid-template-columns: 1fr; }
+    .company-cta-grid { grid-template-columns: 1fr; align-items: start; }
+    .company-footer-grid { grid-template-columns: 1fr 1fr; }
+    .company-footer-brand { grid-column: 1 / -1; grid-row: auto; padding-right: 0; }
+}
+
+@media (max-width: 600px) {
+    body.company-page .container,
+    body.company-page .navbar .container { width: calc(100% - 32px); }
+    .company-hero { padding: 112px 0 65px; }
+    .company-hero h1 { font-size: clamp(46px, 14vw, 64px); }
+    .company-hero-copy > p { font-size: 15px; line-height: 1.72; }
+    .company-hero-actions { flex-direction: column; }
+    .company-hero-actions .btn { width: 100%; }
+    .company-visual { min-height: 340px; }
+    .company-numbers-grid { grid-template-columns: 1fr; }
+    .company-number { min-height: 215px; padding: 32px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.10); }
+    .company-number:last-child { border-bottom: 0; }
+    .company-section { padding: 72px 0; }
+    .company-section h2 { font-size: clamp(38px, 11vw, 54px); }
+    .company-story-block { grid-template-columns: 46px 1fr; gap: 16px; }
+    .company-story-icon { width: 44px; height: 44px; }
+    .company-pillars,
+    .company-method-grid { grid-template-columns: 1fr; }
+    .company-pillar { min-height: 300px; }
+    .company-method-step { min-height: 230px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.16); }
+    .company-method-step:last-child { border-bottom: 0; }
+    .company-method-step h3 { margin-top: 52px; }
+    .company-quote { padding: 34px; }
+    .company-cta { padding: 72px 0; }
+    .company-footer-grid { grid-template-columns: 1fr; }
+    .company-footer-brand { grid-column: auto; }
+    .company-footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+'''
+          (root / 'pages/company/company.css').write_text(company_css, encoding='utf-8')
+
+          company_footer = r'''<footer class="company-footer">
+  <div class="container">
+    <div class="company-footer-grid">
+      <div class="company-footer-brand">
+        <img src="../../imgs/logo-controlcenter.webp" alt="ControlCenter">
+        <p>Infraestrutura, segurança, suporte e gestão de TI para empresas que precisam manter suas operações disponíveis, protegidas e produtivas.</p>
+      </div>
+      <div>
+        <h4>Institucional</h4>
+        <a href="../../index.html#inicio">Home</a>
+        <a href="index.html">Empresa</a>
+        <a href="../../index.html#clientes">Clientes</a>
+        <a href="../../index.html#insights">Conteúdos</a>
+        <a href="../../index.html#contato">Contato</a>
+      </div>
+      <div>
+        <h4>Infraestrutura</h4>
+        <a href="../solutions/gestao-de-redes.html">Gestão de Redes</a>
+        <a href="../solutions/servidores.html">Servidores</a>
+        <a href="../solutions/wifi-corporativo.html">Wi-Fi Corporativo</a>
+        <a href="../solutions/conectividade.html">Conectividade</a>
+      </div>
+      <div>
+        <h4>Segurança</h4>
+        <a href="../solutions/seguranca.html">Segurança</a>
+        <a href="../solutions/firewall.html">Firewall</a>
+        <a href="../solutions/backup.html">Backup</a>
+        <a href="../solutions/monitoramento.html">Monitoramento</a>
+      </div>
+      <div>
+        <h4>Serviços</h4>
+        <a href="../solutions/suporte-remoto.html">Suporte Remoto</a>
+        <a href="../solutions/suporte-presencial.html">Suporte Presencial</a>
+        <a href="../solutions/gestao-de-ti.html">Gestão de TI</a>
+        <a href="../solutions/manutencao.html">Manutenção</a>
+      </div>
+    </div>
+    <div class="company-footer-bottom">
+      <span>© 2026 ControlCenter. Todos os direitos reservados.</span>
+      <a href="../../index.html#contato">Falar com a ControlCenter</a>
+    </div>
+  </div>
+</footer>'''
+
+          company_path = root / 'pages/company/index.html'
+          company = company_path.read_text(encoding='utf-8')
+          company = re.sub(r'<footer class="company-footer">.*?</footer>', company_footer, company, flags=re.S)
+          company = company.replace('href="../../index.html#solucoes">Soluções', 'href="../../index.html#solucoes">Soluções')
+          company_path.write_text(company, encoding='utf-8')
+
+          solution_footer = r'''<footer class="footer">
+  <div class="container">
+    <div class="footer-grid footer-grid-complete">
+      <div class="footer-brand">
+        <img src="../../imgs/logo-controlcenter.webp" alt="ControlCenter">
+        <p>Tecnologia para empresas que não podem parar.</p>
+      </div>
+      <div>
+        <h4>Institucional</h4>
+        <a href="../../index.html#inicio">Home</a>
+        <a href="../company/index.html">Empresa</a>
+        <a href="../../index.html#clientes">Clientes</a>
+        <a href="../../index.html#insights">Conteúdos</a>
+        <a href="../../index.html#contato">Contato</a>
+      </div>
+      <div>
+        <h4>Infraestrutura</h4>
+        <a href="gestao-de-redes.html">Gestão de Redes</a>
+        <a href="servidores.html">Servidores</a>
+        <a href="wifi-corporativo.html">Wi-Fi Corporativo</a>
+        <a href="conectividade.html">Conectividade</a>
+      </div>
+      <div>
+        <h4>Segurança</h4>
+        <a href="seguranca.html">Segurança</a>
+        <a href="firewall.html">Firewall</a>
+        <a href="backup.html">Backup</a>
+        <a href="monitoramento.html">Monitoramento</a>
+      </div>
+      <div>
+        <h4>Serviços</h4>
+        <a href="suporte-remoto.html">Suporte Remoto</a>
+        <a href="suporte-presencial.html">Suporte Presencial</a>
+        <a href="gestao-de-ti.html">Gestão de TI</a>
+        <a href="manutencao.html">Manutenção</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ControlCenter. Todos os direitos reservados.</span>
+      <a href="../../index.html#contato">Falar com a ControlCenter</a>
+    </div>
+  </div>
+</footer>'''
+
+          for path in (root / 'pages/solutions').glob('*.html'):
+              html = path.read_text(encoding='utf-8')
+              html = re.sub(r'<footer class="footer">.*?</footer>', solution_footer, html, flags=re.S)
+              html = html.replace('href="../../index.html#empresa"', 'href="../company/index.html"')
+              path.write_text(html, encoding='utf-8')
+
+          solutions_css_path = root / 'pages/solutions/solutions.css'
+          solutions_css = solutions_css_path.read_text(encoding='utf-8')
+          solutions_css += r'''
+
+/* Complete footer routing layout */
+.footer-grid.footer-grid-complete { grid-template-columns: 1.35fr repeat(4,1fr); gap: 38px; }
+.footer-grid.footer-grid-complete > div { min-width: 0; }
+@media (max-width: 1100px) {
+  .footer-grid.footer-grid-complete { grid-template-columns: 1.3fr repeat(2,1fr); }
+  .footer-grid.footer-grid-complete .footer-brand { grid-row: span 2; }
+}
+@media (max-width: 760px) {
+  .footer-grid.footer-grid-complete { grid-template-columns: 1fr 1fr; }
+  .footer-grid.footer-grid-complete .footer-brand { grid-column: 1 / -1; grid-row: auto; }
+}
+@media (max-width: 520px) {
+  .footer-grid.footer-grid-complete { grid-template-columns: 1fr; }
+  .footer-grid.footer-grid-complete .footer-brand { grid-column: auto; }
+}
+'''
+          solutions_css_path.write_text(solutions_css, encoding='utf-8')
+
+          home_footer = r'''<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="footer-logo" href="#inicio" aria-label="ControlCenter - Home">
+          <img src="imgs/logo-controlcenter.webp" alt="ControlCenter">
+        </a>
+        <p>Infraestrutura, segurança, suporte e gestão de TI para empresas que precisam manter suas operações disponíveis, protegidas e produtivas.</p>
+      </div>
+      <div class="footer-column">
+        <h4>Institucional</h4>
+        <a href="#inicio"><i class="bi bi-arrow-right"></i>Home</a>
+        <a href="pages/company/index.html"><i class="bi bi-arrow-right"></i>Empresa</a>
+        <a href="#clientes"><i class="bi bi-arrow-right"></i>Clientes</a>
+        <a href="#insights"><i class="bi bi-arrow-right"></i>Conteúdos</a>
+        <a href="#contato"><i class="bi bi-arrow-right"></i>Contato</a>
+      </div>
+      <div class="footer-column">
+        <h4>Infraestrutura</h4>
+        <a href="pages/solutions/gestao-de-redes.html"><i class="bi bi-diagram-3"></i>Gestão de Redes</a>
+        <a href="pages/solutions/servidores.html"><i class="bi bi-server"></i>Servidores</a>
+        <a href="pages/solutions/wifi-corporativo.html"><i class="bi bi-wifi"></i>Wi-Fi Corporativo</a>
+        <a href="pages/solutions/conectividade.html"><i class="bi bi-router"></i>Conectividade</a>
+      </div>
+      <div class="footer-column">
+        <h4>Segurança</h4>
+        <a href="pages/solutions/seguranca.html"><i class="bi bi-shield-check"></i>Segurança</a>
+        <a href="pages/solutions/firewall.html"><i class="bi bi-bricks"></i>Firewall</a>
+        <a href="pages/solutions/backup.html"><i class="bi bi-cloud-arrow-up"></i>Backup</a>
+        <a href="pages/solutions/monitoramento.html"><i class="bi bi-activity"></i>Monitoramento</a>
+      </div>
+      <div class="footer-column">
+        <h4>Serviços</h4>
+        <a href="pages/solutions/suporte-remoto.html"><i class="bi bi-headset"></i>Suporte Remoto</a>
+        <a href="pages/solutions/suporte-presencial.html"><i class="bi bi-person-workspace"></i>Suporte Presencial</a>
+        <a href="pages/solutions/gestao-de-ti.html"><i class="bi bi-gear"></i>Gestão de TI</a>
+        <a href="pages/solutions/manutencao.html"><i class="bi bi-tools"></i>Manutenção</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ControlCenter. Todos os direitos reservados.</span>
+      <a href="#contato">Falar com a ControlCenter</a>
+    </div>
+  </div>
+</footer>'''
+
+          home_path = root / 'index.html'
+          home = home_path.read_text(encoding='utf-8')
+          home = re.sub(r'<footer class="footer">.*?</footer>', home_footer, home, flags=re.S)
+          home_path.write_text(home, encoding='utf-8')
+          PY
+
+      - name: Commit polish
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html pages/company pages/solutions
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "fix: polish company CSS navigation and footers"
+          git push
