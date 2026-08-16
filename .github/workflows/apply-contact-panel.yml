@@ -1,0 +1,123 @@
+name: Apply full contact panel
+
+on:
+  push:
+    branches:
+      - fix/contact-panel-everywhere
+    paths:
+      - '.github/workflows/apply-contact-panel.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/contact-panel-everywhere
+
+      - name: Replace simple contact buttons with the full ControlCenter panel
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          WIDGET = r'''
+<!-- CONTROLCENTER CONTACT WIDGET -->
+<div class="contact-floating" id="contactFloating">
+  <button class="contact-floating-trigger" id="contactFloatingTrigger" type="button" aria-label="Abrir informações de contato" aria-expanded="false">
+    <span class="contact-trigger-content"><i class="bi bi-chat-square-dots"></i>Fale conosco</span>
+  </button>
+
+  <aside class="contact-floating-panel" id="contactFloatingPanel" aria-hidden="true" aria-label="Informações de contato da ControlCenter">
+    <div class="contact-panel-header">
+      <small>Atendimento ControlCenter</small>
+      <h3>Fale com nossos especialistas</h3>
+      <p>Segunda a sexta, das 8h às 18h</p>
+      <button class="contact-panel-close" id="contactPanelClose" type="button" aria-label="Fechar informações de contato"><i class="bi bi-x-lg"></i></button>
+    </div>
+
+    <div class="contact-panel-body">
+      <div class="contact-info-item">
+        <div class="contact-info-icon"><i class="bi bi-telephone"></i></div>
+        <div class="contact-info-content"><span>Telefone</span><a href="tel:+5532984683427">(32) 98468-3427</a></div>
+      </div>
+      <div class="contact-info-item">
+        <div class="contact-info-icon"><i class="bi bi-whatsapp"></i></div>
+        <div class="contact-info-content"><span>WhatsApp</span><a href="https://wa.me/5532984683427" target="_blank" rel="noopener noreferrer">(32) 98468-3427</a></div>
+      </div>
+      <div class="contact-info-item">
+        <div class="contact-info-icon"><i class="bi bi-envelope"></i></div>
+        <div class="contact-info-content"><span>E-mail</span><a href="mailto:contato@controlcenter.inf.br">contato@controlcenter.inf.br</a></div>
+      </div>
+      <div class="contact-info-item">
+        <div class="contact-info-icon"><i class="bi bi-geo-alt"></i></div>
+        <div class="contact-info-content"><span>Escritório</span><strong>R. Santo Antônio, 1026<br>Centro • Juiz de Fora/MG</strong></div>
+      </div>
+    </div>
+
+    <div class="contact-panel-footer">
+      <p>Precisa falar conosco agora?</p>
+      <a href="https://wa.me/5532984683427?text=Olá%20ControlCenter!%20Gostaria%20de%20falar%20com%20um%20especialista." target="_blank" rel="noopener noreferrer" class="contact-panel-action"><i class="bi bi-whatsapp"></i>Falar agora<i class="bi bi-arrow-up-right"></i></a>
+    </div>
+  </aside>
+</div>
+<!-- /CONTROLCENTER CONTACT WIDGET -->
+'''
+
+          def update_page(path: Path, shared_prefix: str):
+              text = path.read_text(encoding='utf-8')
+
+              # Remove the previous compact floating button/styles introduced on internal pages.
+              text = re.sub(r'\s*<style id="global-contact-float-style">.*?</style>\s*', '\n', text, flags=re.S)
+              text = re.sub(r'\s*<a class="global-contact-float"[^>]*>.*?</a>\s*', '\n', text, flags=re.S)
+              text = re.sub(r'\s*<a class="contact-float"[^>]*>.*?</a>\s*', '\n', text, flags=re.S)
+
+              # Make reruns idempotent.
+              text = re.sub(r'\s*<link rel="stylesheet" href="[^"]*shared/contact-widget\.css">\s*', '\n', text)
+              text = re.sub(r'\s*<script src="[^"]*shared/contact-widget\.js"></script>\s*', '\n', text)
+              text = re.sub(r'\s*<!-- CONTROLCENTER CONTACT WIDGET -->.*?<!-- /CONTROLCENTER CONTACT WIDGET -->\s*', '\n', text, flags=re.S)
+
+              css = f'<link rel="stylesheet" href="{shared_prefix}contact-widget.css">'
+              js = f'<script src="{shared_prefix}contact-widget.js"></script>'
+
+              if '</head>' not in text or '</body>' not in text:
+                  raise RuntimeError(f'HTML structure not found in {path}')
+
+              text = text.replace('</head>', css + '</head>', 1)
+              text = text.replace('</body>', WIDGET + js + '</body>', 1)
+              path.write_text(text, encoding='utf-8')
+
+          one_level = [
+              Path('pages/company/index.html'),
+              Path('pages/clients/index.html'),
+              Path('pages/contents/index.html'),
+              *sorted(Path('pages/solutions').glob('*.html')),
+          ]
+
+          articles = sorted(Path('pages/contents/articles').glob('*.html'))
+
+          for page in one_level:
+              update_page(page, '../shared/')
+
+          for page in articles:
+              update_page(page, '../../shared/')
+
+          print(f'Updated {len(one_level) + len(articles)} internal pages.')
+          PY
+
+      - name: Commit page updates
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/company/index.html pages/clients/index.html pages/solutions/*.html pages/contents/index.html pages/contents/articles/*.html
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "feat: use full ControlCenter contact panel across internal pages"
+          git push origin HEAD:fix/contact-panel-everywhere
