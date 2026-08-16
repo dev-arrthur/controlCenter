@@ -15,124 +15,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feat/portal-enterprise-realtime-security
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
 
-      - name: Apply final security and realtime integration patches
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          # --- Client: remove invalid/invented SRI from Socket.IO CDN include.
-          p = Path('workspace/client/ticket.html')
-          s = p.read_text()
-          s = re.sub(
-              r'<script src="https://cdn\.socket\.io/4\.8\.1/socket\.io\.min\.js"[^>]*></script>',
-              '<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>',
-              s,
-              count=1
-          )
-          p.write_text(s)
-
-          # --- Admin ticket: message ids, audited assignment flow, attachments and realtime refresh hook.
-          p = Path('workspace/admin/assets/js/admin.js')
-          s = p.read_text()
-
-          old = '''<div class="message ${msg.authorType === 'admin' ? 'admin-message' : 'client'} ${msg.internal ? 'internal-message' : ''}">'''
-          new = '''<div class="message ${msg.authorType === 'admin' ? 'admin-message' : 'client'} ${msg.internal ? 'internal-message' : ''}" data-message-id="${escapeHtml(msg.id)}">'''
-          assert old in s, 'admin message markup not found'
-          s = s.replace(old, new, 1)
-
-          old = """      $('#assigneeControl').value = ticket.assignedTo || '';
-      return ticket;"""
-          new = """      $('#assigneeControl').value = ticket.assignedTo || '';
-      if (window.CCAttachments) await window.CCAttachments.refresh();
-      return ticket;"""
-          assert old in s, 'admin refresh return block not found'
-          s = s.replace(old, new, 1)
-
-          old = """    await refresh();
-
-    $('#saveTicketControls')?.addEventListener('click', async () => {"""
-          new = """    await refresh();
-    window.CCRefreshTicket = refresh;
-    window.dispatchEvent(new CustomEvent('cc:ticket-ready', { detail: { id } }));
-
-    $('#saveTicketControls')?.addEventListener('click', async () => {"""
-          assert old in s, 'admin initial refresh block not found'
-          s = s.replace(old, new, 1)
-
-          old = """await CCAdminApi.updateTicket(id, { status: $('#statusControl').value, priority: $('#priorityControl').value, assignedTo: $('#assigneeControl').value || null });"""
-          new = """await CCAdminApi.updateTicket(id, { status: $('#statusControl').value, priority: $('#priorityControl').value });"""
-          assert old in s, 'admin direct assignee update not found'
-          s = s.replace(old, new, 1)
-
-          old = """      try { await CCAdminApi.sendMessage(id, { message, internal:false }); $('#replyMessage').value = ''; toast('Resposta enviada ao cliente.'); await refresh(); }
-      catch (error) { toast(error.message, 'error'); }"""
-          new = """      try {
-        const sent = await CCAdminApi.sendMessage(id, { message, internal:false });
-        $('#replyMessage').value = '';
-        if (window.CCAttachments) {
-          try { await window.CCAttachments.uploadFiles({ messageId: sent.message.id, input: $('#replyAttachments') }); }
-          catch (uploadError) { toast(`Resposta enviada, mas o anexo falhou: ${uploadError.message}`, 'error'); }
-        }
-        toast('Resposta enviada ao cliente.');
-        await refresh();
-      }
-      catch (error) { toast(error.message, 'error'); }"""
-          assert old in s, 'admin reply handler not found'
-          s = s.replace(old, new, 1)
-
-          old = """      try { await CCAdminApi.sendMessage(id, { message, internal:true }); $('#internalNote').value = ''; toast('Nota interna adicionada.'); await refresh(); }
-      catch (error) { toast(error.message, 'error'); }"""
-          new = """      try {
-        const sent = await CCAdminApi.sendMessage(id, { message, internal:true });
-        $('#internalNote').value = '';
-        if (window.CCAttachments) {
-          try { await window.CCAttachments.uploadFiles({ messageId: sent.message.id, input: $('#internalNoteAttachments') }); }
-          catch (uploadError) { toast(`Nota salva, mas o anexo falhou: ${uploadError.message}`, 'error'); }
-        }
-        toast('Nota interna adicionada.');
-        await refresh();
-      }
-      catch (error) { toast(error.message, 'error'); }"""
-          assert old in s, 'admin internal note handler not found'
-          s = s.replace(old, new, 1)
-          p.write_text(s)
-
-          # --- Backend: require stronger passwords and force transfers through audited endpoint.
-          p = Path('api/portal.js')
-          s = p.read_text()
-          old = "function validNewPassword(password) {\n  return typeof password === 'string' && password.length >= 10 && /[A-Za-z]/.test(password) && /\\d/.test(password);\n}"
-          new = "function validNewPassword(password) {\n  return typeof password === 'string' && password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\\d/.test(password) && /[^A-Za-z0-9]/.test(password);\n}"
-          assert old in s, 'password validator not found'
-          s = s.replace(old, new, 1)
-          s = s.replace('A nova senha deve ter pelo menos 10 caracteres, com letras e números.', 'A nova senha deve ter pelo menos 12 caracteres, com maiúscula, minúscula, número e símbolo.')
-          s = s.replace('Informe empresa, usuário, e-mail válido e uma senha com pelo menos 10 caracteres, letras e números.', 'Informe empresa, usuário, e-mail válido e uma senha com pelo menos 12 caracteres, maiúscula, minúscula, número e símbolo.')
-          s = s.replace('A senha temporária deve ter pelo menos 10 caracteres, com letras e números.', 'A senha temporária deve ter pelo menos 12 caracteres, com maiúscula, minúscula, número e símbolo.')
-
-          old = """  if (input.assignedTo !== undefined) {
-    if (!input.assignedTo) {
-      update.assignedTo = null;
-    } else {
-      const assignedId = objectId(input.assignedTo);
-      const assignee = assignedId ? await session.db.collection('users').findOne({ _id: assignedId, role: { $in: ADMIN_ROLES }, active: true }) : null;
-      if (!assignee) return fail(res, 422, 'INVALID_ASSIGNEE', 'Responsável inválido.');
-      update.assignedTo = assignee._id;
-      if (!update.status && ticket.status === 'aberto') update.status = 'em_atendimento';
-    }
-  }"""
-          new = """  if (input.assignedTo !== undefined) {
-    return fail(res, 409, 'TRANSFER_ENDPOINT_REQUIRED', 'Use o fluxo de transferência auditada para alterar o responsável pelo chamado.');
-  }"""
-          assert old in s, 'direct assignee backend block not found'
-          s = s.replace(old, new, 1)
-          p.write_text(s)
-          PY
+      - name: Apply final integration patches
+        run: python3 scripts/finalize-enterprise.py
 
       - name: Update dependency lock
         run: npm install --package-lock-only --ignore-scripts
@@ -140,10 +30,10 @@ jobs:
       - name: Install exact dependencies
         run: npm ci --ignore-scripts
 
-      - name: Project validation
+      - name: Validate project
         run: npm run check
 
-      - name: Syntax validation
+      - name: Validate JavaScript syntax
         run: |
           node --check api/portal.js
           node --check api/gateway.js
@@ -157,25 +47,10 @@ jobs:
           node --check workspace/admin/assets/js/teamAccess.js
           node --check workspace/admin/assets/js/ticketTransfer.js
 
-      - name: Security contract validation
-        shell: bash
-        run: |
-          grep -q "bcrypt.hash" api/admin-enterprise.js
-          grep -q "createHmac('sha256'" api/_portal-security.js
-          grep -q "createHash('sha256'" api/attachment.js
-          grep -q "access: 'private'" api/attachment.js
-          grep -q "enforceRateLimit" api/gateway.js
-          grep -q "TRANSFER_ENDPOINT_REQUIRED" api/portal.js
-          grep -q "data-message-id" workspace/client/assets/js/portal.js
-          grep -q "data-message-id" workspace/admin/assets/js/admin.js
-          grep -q "CCAttachments.uploadFiles" workspace/admin/assets/js/admin.js
-          grep -q '"source": "/api/portal", "destination": "/api/gateway"' vercel.json
-          ! grep -q 'workspace/admin' index.html
-          ! grep -q 'loginAdmin.html' workspace/client/*.html
-          ! grep -q 'integrity="sha384-8A7DTQ' workspace/client/ticket.html
+      - name: Validate security contract
+        run: node scripts/check-enterprise-contract.js
 
-      - name: Commit generated lock and validated patches
-        shell: bash
+      - name: Commit generated files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
