@@ -20,17 +20,17 @@
       <div class="login-proof">
         <div><i class="bi bi-ticket-detailed"></i><strong>Chamados organizados</strong><span>Histórico e status sempre disponíveis.</span></div>
         <div><i class="bi bi-chat-square-text"></i><strong>Conversa centralizada</strong><span>Atualizações dentro de cada atendimento.</span></div>
-        <div><i class="bi bi-shield-check"></i><strong>Acesso da sua empresa</strong><span>Ambiente separado por organização.</span></div>
+        <div><i class="bi bi-shield-check"></i><strong>Acesso protegido</strong><span>Seu usuário abre somente o ambiente da empresa vinculada.</span></div>
       </div>
     </div>
     <div class="login-footer-note">© 2026 ControlCenter • Portal de Atendimento</div>
   </section>
   <main class="login-form-panel">
     <div class="login-box">
-      <div class="login-box-head"><span>Acesso seguro</span><h2>Área do Cliente</h2><p>Use o código da sua empresa e suas credenciais para entrar.</p></div>
+      <div class="login-box-head"><span>Acesso seguro</span><h2>Área do Cliente</h2><p>Entre com seu e-mail e sua senha. O portal identifica automaticamente a sua empresa.</p></div>
       <div class="login-alert" id="loginAlert" role="alert"></div>
       <form id="loginForm" autocomplete="on">
-        <div class="form-group"><label for="organizationCode">Código da empresa</label><div class="field-wrap"><i class="bi bi-buildings"></i><input id="organizationCode" name="organizationCode" type="text" autocomplete="organization" required maxlength="80" placeholder="Ex.: maximum"></div></div>
+        <input id="organizationCode" name="organizationCode" type="hidden" value="">
         <div class="form-group"><label for="email">E-mail</label><div class="field-wrap"><i class="bi bi-envelope"></i><input id="email" name="email" type="email" autocomplete="email" required placeholder="voce@empresa.com.br"></div></div>
         <div class="form-group"><label for="password">Senha</label><div class="field-wrap"><i class="bi bi-lock"></i><input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Sua senha"><button class="password-toggle" id="togglePassword" type="button" aria-label="Mostrar ou ocultar senha"><i class="bi bi-eye"></i></button></div></div>
         <button class="login-submit" id="loginSubmit" type="submit">Entrar no portal <i class="bi bi-arrow-right"></i></button>

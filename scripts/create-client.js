@@ -35,31 +35,38 @@ function required(name) {
   const db = client.db(dbName);
   const now = new Date();
 
+  const emailOwner = await db.collection('users').findOne({ email, role: { $in: ['client', 'client_admin'] } });
+  if (emailOwner) throw new Error('Este e-mail já possui um acesso de cliente. O login agora usa apenas e-mail e senha, portanto o e-mail precisa ser único.');
+
   const orgResult = await db.collection('organizations').findOneAndUpdate(
     { code: companyCode },
     {
-      $set: { name: companyName, active: true, updatedAt: now },
-      $setOnInsert: { code: companyCode, createdAt: now }
+      $set: { name: companyName, kind: 'client', active: true, updatedAt: now },
+      $setOnInsert: { code: companyCode, supportTier: '', createdAt: now }
     },
     { upsert: true, returnDocument: 'after' }
   );
   const organization = orgResult?.value || orgResult;
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await db.collection('users').updateOne(
-    { organizationId: organization._id, email },
-    {
-      $set: { name, phone, email, passwordHash, role: 'client_admin', active: true, updatedAt: now },
-      $setOnInsert: { organizationId: organization._id, sessionVersion: 1, createdAt: now }
-    },
-    { upsert: true }
-  );
+  await db.collection('users').insertOne({
+    organizationId: organization._id,
+    name,
+    phone,
+    email,
+    passwordHash,
+    role: 'client',
+    active: true,
+    forcePasswordChange: false,
+    sessionVersion: 1,
+    createdAt: now,
+    updatedAt: now
+  });
 
-  console.log('\nCliente criado/atualizado com sucesso.');
+  console.log('\nCliente criado com sucesso.');
   console.log(`Empresa: ${companyName}`);
-  console.log(`Código: ${companyCode}`);
   console.log(`Usuário: ${email}`);
-  console.log('Use esses dados em workspace/client/loginClient.html\n');
+  console.log('O usuário entra em workspace/client/loginClient.html apenas com e-mail e senha.\n');
   await client.close();
 })().catch(error => {
   console.error(`\nErro: ${error.message}\n`);

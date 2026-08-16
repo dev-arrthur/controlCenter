@@ -2,19 +2,21 @@
   "name": "controlcenter-client-portal",
   "version": "1.0.0",
   "private": true,
-  "description": "Portal de chamados da área de clientes ControlCenter",
+  "description": "Portais de chamados da ControlCenter para clientes e equipe administrativa",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "predev": "node scripts/seed-dev-users.js",
     "dev": "npx vercel dev",
     "create-client": "node scripts/create-client.js",
+    "seed:dev": "node scripts/seed-dev-users.js",
     "check": "node scripts/check-project.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.8.0",
-    "dotenv": "^16.4.5"
+    "mongodb": "^6.8.0"
   }
 }

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Acesso Administrativo | ControlCenter</title>
+  <link rel="icon" href="../../imgs/logo-controlcenter.webp">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../client/assets/css/portal.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="login-page admin-login" data-page="login-admin">
+  <section class="login-brand-panel">
+    <div class="login-logo"><img src="../../imgs/logo-controlcenter.webp" alt="ControlCenter"></div>
+    <div class="login-copy">
+      <div class="login-eyebrow">Service Desk ControlCenter</div>
+      <h1>Atendimento, gestão e contexto em um painel <span>feito para a operação.</span></h1>
+      <p>Centralize chamados, clientes, responsáveis, prioridades, respostas e notas internas em uma visão única para a equipe ControlCenter.</p>
+      <div class="login-proof">
+        <div><i class="bi bi-inboxes"></i><strong>Fila centralizada</strong><span>Todos os chamados e prioridades em uma única operação.</span></div>
+        <div><i class="bi bi-people"></i><strong>Gestão de clientes</strong><span>Empresas, usuários e acessos organizados.</span></div>
+        <div><i class="bi bi-shield-lock"></i><strong>Acesso restrito</strong><span>Sessão administrativa separada do Portal do Cliente.</span></div>
+      </div>
+    </div>
+    <div class="login-footer-note">© 2026 ControlCenter • Ambiente administrativo</div>
+  </section>
+  <main class="login-form-panel">
+    <div class="login-box">
+      <div class="login-box-head"><span>Acesso interno</span><h2>Painel Administrativo</h2><p>Entre com seu e-mail corporativo e sua senha.</p></div>
+      <div class="login-alert" id="loginAlert" role="alert"></div>
+      <form id="adminLoginForm" autocomplete="on">
+        <div class="form-group"><label for="email">E-mail</label><div class="field-wrap"><i class="bi bi-envelope"></i><input id="email" name="email" type="email" autocomplete="email" required placeholder="voce@controlcentertech.com.br"></div></div>
+        <div class="form-group"><label for="password">Senha</label><div class="field-wrap"><i class="bi bi-lock"></i><input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Sua senha"><button class="password-toggle" id="togglePassword" type="button" aria-label="Mostrar ou ocultar senha"><i class="bi bi-eye"></i></button></div></div>
+        <button class="login-submit" id="loginSubmit" type="submit">Entrar no painel <i class="bi bi-arrow-right"></i></button>
+      </form>
+      <div class="admin-security-note"><i class="bi bi-shield-check"></i><span>Este ambiente é exclusivo para a equipe autorizada da ControlCenter. Tentativas de acesso são controladas e registradas.</span></div>
+    </div>
+  </main>
+  <script src="assets/js/apiAdmin.js"></script><script src="assets/js/admin.js"></script>
+</body>
+</html>
