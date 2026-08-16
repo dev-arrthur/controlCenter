@@ -1,0 +1,18 @@
+/* ControlCenter — cards estaticos com navegacao manual */
+.cc-card-carousel{position:relative;margin-bottom:22px;padding:0 48px}
+.cc-card-track{display:flex!important;grid-template-columns:none!important;gap:14px!important;margin-bottom:0!important;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;overscroll-behavior-inline:contain;scrollbar-width:none;-ms-overflow-style:none;padding:2px 1px 8px}
+.cc-card-track::-webkit-scrollbar{display:none}
+.cc-card-track>.stat-card{flex:0 0 calc((100% - 28px)/3);scroll-snap-align:start;scroll-snap-stop:always;min-width:0;border:1px solid #d7e1e9!important;border-radius:16px!important;background:#fff!important;box-shadow:0 1px 2px rgba(18,39,57,.035),0 8px 24px rgba(18,39,57,.045)!important;transform:none!important;transition:border-color .18s ease,box-shadow .18s ease!important}
+.cc-card-track>.stat-card:hover{transform:none!important;border-color:#c6d5e1!important;box-shadow:0 1px 2px rgba(18,39,57,.045),0 10px 28px rgba(18,39,57,.055)!important}
+.cc-card-arrow{position:absolute;top:50%;z-index:4;width:38px;height:38px;display:grid;place-items:center;border:1px solid #d5e0e8;border-radius:50%;background:#fff;color:#174f82;box-shadow:0 7px 22px rgba(18,39,57,.10);transform:translateY(-50%);transition:border-color .16s ease,background .16s ease,color .16s ease,opacity .16s ease;cursor:pointer}
+.cc-card-arrow:hover:not(:disabled){background:#f4f8fb;border-color:#b8ccdc;color:#0e385f}
+.cc-card-arrow:focus-visible{outline:3px solid rgba(23,79,130,.16);outline-offset:2px}
+.cc-card-arrow:disabled{opacity:.28;cursor:default;box-shadow:none}
+.cc-card-arrow-prev{left:0}.cc-card-arrow-next{right:0}
+.cc-card-arrow i{font-size:17px;line-height:1}
+body[data-page="dashboard"] .panel,body[data-page="admin-dashboard"] .panel{border-color:#d9e2e9!important;border-radius:16px!important;box-shadow:0 1px 2px rgba(18,39,57,.025),0 8px 24px rgba(18,39,57,.035)}
+body[data-page="dashboard"] .quick-actions a{border:1px solid transparent;transition:background .16s ease,border-color .16s ease}
+body[data-page="dashboard"] .quick-actions a:hover{transform:none;border-color:#e2e9ef;background:#f8fafc}
+@media(max-width:1000px){.cc-card-track>.stat-card{flex-basis:calc((100% - 14px)/2)}}
+@media(max-width:650px){.cc-card-carousel{padding:0 38px}.cc-card-track>.stat-card{flex-basis:100%}.cc-card-arrow{width:32px;height:32px}}
+@media(prefers-reduced-motion:reduce){.cc-card-track{scroll-behavior:auto}.cc-card-track>.stat-card,.cc-card-arrow{transition:none!important}}
