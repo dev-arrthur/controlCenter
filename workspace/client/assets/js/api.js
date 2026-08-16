@@ -44,7 +44,7 @@
     createTicket: body => request('/api/portal?action=tickets', { method:'POST', body }),
     ticket: id => request(`/api/portal?action=ticket&id=${encodeURIComponent(id)}`),
     ticketAction: (id, action) => request(`/api/portal?action=ticket&id=${encodeURIComponent(id)}`, { method:'PATCH', body:{ action } }),
-    sendMessage: (id, message) => request(`/api/portal?action=message&id=${encodeURIComponent(id)}`, { method:'POST', body:{ message } }),
+    sendMessage: (id, body) => request(`/api/portal?action=message&id=${encodeURIComponent(id)}`, { method:'POST', body: typeof body === 'string' ? { message: body } : body }),
     profile: () => request('/api/portal?action=profile'),
     updateProfile: body => request('/api/portal?action=profile', { method:'PATCH', body }),
     changePassword: body => request('/api/portal?action=password', { method:'POST', body })

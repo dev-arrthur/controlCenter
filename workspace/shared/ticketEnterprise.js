@@ -10,6 +10,8 @@
   let pollingTimer = null;
   let socket = null;
   let socketReady = false;
+  let imageZoom = 1;
+  let replyTarget = null;
 
   function escapeHtml(value='') {
     return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -102,15 +104,38 @@
       <div class="attachment-image-modal-card" role="dialog" aria-modal="true" aria-labelledby="attachmentImageModalTitle">
         <div class="attachment-image-modal-head">
           <div><small>ANEXO DO CHAMADO</small><strong id="attachmentImageModalTitle">Imagem</strong><span id="attachmentImageModalSize"></span></div>
+          <div class="attachment-image-modal-tools" aria-label="Controles de zoom">
+            <button type="button" data-image-zoom-out aria-label="Diminuir zoom"><i class="bi bi-dash-lg"></i></button>
+            <button type="button" data-image-zoom-reset aria-label="Restaurar zoom"><span data-image-zoom-label>100%</span></button>
+            <button type="button" data-image-zoom-in aria-label="Aumentar zoom"><i class="bi bi-plus-lg"></i></button>
+          </div>
           <button type="button" class="attachment-image-modal-close" data-image-modal-close aria-label="Fechar imagem"><i class="bi bi-x-lg"></i></button>
         </div>
-        <div class="attachment-image-modal-body"><img id="attachmentImageModalPreview" alt=""></div>
+        <div class="attachment-image-modal-body"><div class="attachment-image-stage"><img id="attachmentImageModalPreview" alt=""></div></div>
       </div>`;
     document.body.appendChild(modal);
     modal.addEventListener('click', event => {
-      if (event.target.closest('[data-image-modal-close]')) closeImageModal();
+      if (event.target.closest('[data-image-modal-close]')) return closeImageModal();
+      if (event.target.closest('[data-image-zoom-in]')) return setImageZoom(imageZoom + 0.25);
+      if (event.target.closest('[data-image-zoom-out]')) return setImageZoom(imageZoom - 0.25);
+      if (event.target.closest('[data-image-zoom-reset]')) return setImageZoom(1);
     });
+    const body = modal.querySelector('.attachment-image-modal-body');
+    body?.addEventListener('wheel', event => {
+      if (!modal.classList.contains('open')) return;
+      event.preventDefault();
+      setImageZoom(imageZoom + (event.deltaY < 0 ? 0.15 : -0.15));
+    }, { passive:false });
+    modal.querySelector('#attachmentImageModalPreview')?.addEventListener('dblclick', () => setImageZoom(1));
     return modal;
+  }
+  function setImageZoom(value) {
+    imageZoom = Math.max(0.5, Math.min(4, Math.round(value * 20) / 20));
+    const modal = document.getElementById('attachmentImageModal');
+    const image = modal?.querySelector('#attachmentImageModalPreview');
+    const label = modal?.querySelector('[data-image-zoom-label]');
+    if (image) image.style.transform = `scale(${imageZoom})`;
+    if (label) label.textContent = `${Math.round(imageZoom * 100)}%`;
   }
   function openImageModal(trigger) {
     const modal = ensureImageModal();
@@ -121,6 +146,7 @@
     const name = trigger.dataset.imageName || 'Imagem';
     image.src = src;
     image.alt = name;
+    setImageZoom(1);
     title.textContent = name;
     size.textContent = trigger.dataset.imageSize || '';
     modal.hidden = false;
@@ -150,6 +176,51 @@
     });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') closeImageModal();
+    });
+  }
+  function renderReplyTarget() {
+    const textarea = document.querySelector('#replyMessage');
+    if (!textarea) return;
+    let preview = document.querySelector('.reply-target-preview');
+    if (!replyTarget) { if (preview) preview.remove(); return; }
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'reply-target-preview';
+      textarea.insertAdjacentElement('beforebegin', preview);
+    }
+    preview.innerHTML = `<div><small><i class="bi bi-reply"></i> Respondendo a ${escapeHtml(replyTarget.author)}</small><strong>${escapeHtml(replyTarget.excerpt)}</strong></div><button type="button" data-reply-cancel aria-label="Cancelar resposta"><i class="bi bi-x-lg"></i></button>`;
+  }
+  function setReplyTarget(trigger) {
+    replyTarget = {
+      id: trigger.dataset.replyMessageId || '',
+      author: trigger.dataset.replyAuthor || 'Mensagem',
+      excerpt: trigger.dataset.replyExcerpt || ''
+    };
+    renderReplyTarget();
+    document.querySelector('#replyMessage')?.focus();
+    document.querySelector('#replyMessage')?.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+  function clearReplyTarget() {
+    replyTarget = null;
+    renderReplyTarget();
+  }
+  function bindMessageReplies() {
+    if (document.documentElement.dataset.replyBinding === '1') return;
+    document.documentElement.dataset.replyBinding = '1';
+    document.addEventListener('click', event => {
+      const reply = event.target.closest('[data-reply-message-id]');
+      if (reply) { event.preventDefault(); setReplyTarget(reply); return; }
+      if (event.target.closest('[data-reply-cancel]')) { event.preventDefault(); clearReplyTarget(); return; }
+      const reference = event.target.closest('[data-scroll-message]');
+      if (reference) {
+        event.preventDefault();
+        const target = document.querySelector(`.message[data-message-id="${CSS.escape(reference.dataset.scrollMessage || '')}"]`);
+        if (!target) return;
+        target.scrollIntoView({ behavior:'smooth', block:'center' });
+        target.classList.remove('message-highlight');
+        requestAnimationFrame(() => target.classList.add('message-highlight'));
+        setTimeout(() => target.classList.remove('message-highlight'), 1800);
+      }
     });
   }
   function attachmentSignature(items) {
@@ -269,11 +340,12 @@
     }
   }
 
-  global.CCAttachments = { uploadFiles, refresh:refreshAttachments, decorate:decorateMessages };
+  global.CCAttachments = { uploadFiles, refresh:refreshAttachments, decorate:decorateMessages, getReplyToMessageId:() => replyTarget?.id || null, clearReplyTarget };
 
   document.addEventListener('DOMContentLoaded', () => {
     bindAttachmentInputs();
     bindImageModal();
+    bindMessageReplies();
     refreshAttachments();
     connectRealtime();
   });

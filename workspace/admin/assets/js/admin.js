@@ -204,7 +204,9 @@
       <div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div>
       <div class="message-bubble">
         <div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${msg.internal ? 'Nota interna • ' : ''}${fmtDate(msg.createdAt, true)}</span></div>
+        ${msg.replyTo ? `<button class="message-reply-reference" type="button" data-scroll-message="${escapeHtml(msg.replyTo.id)}"><small><i class="bi bi-reply"></i> Respondendo a ${escapeHtml(msg.replyTo.authorName)}</small><span>${escapeHtml(msg.replyTo.message)}</span></button>` : ''}
         <p>${escapeHtml(msg.message)}</p>
+        ${msg.internal ? '' : `<div class="message-actions"><button class="message-reply-action" type="button" data-reply-message-id="${escapeHtml(msg.id)}" data-reply-author="${escapeHtml(msg.authorName)}" data-reply-excerpt="${escapeHtml(msg.message.slice(0,220))}"><i class="bi bi-reply"></i>Responder</button></div>`}
       </div>
     </div>`).join('');
     wrap.scrollTop = wrap.scrollHeight;
@@ -239,6 +241,8 @@
       $('#priorityControl').value = ticket.priority;
       currentAssigneeId = ticket.assignedTo || '';
       $('#assigneeControl').value = currentAssigneeId;
+      const resolveButton = $('#resolveTicket');
+      if (resolveButton) resolveButton.hidden = ['resolvido','fechado'].includes(ticket.status);
       if (window.CCAttachments) await window.CCAttachments.refresh();
       return ticket;
     };
@@ -276,12 +280,26 @@
         await refresh().catch(() => {});
       } finally { button.disabled = false; }
     });
+    $('#resolveTicket')?.addEventListener('click', async () => {
+      if (!confirm('Concluir este chamado como resolvido? O histórico continuará disponível e o cliente poderá visualizar a conclusão.')) return;
+      const button = $('#resolveTicket');
+      button.disabled = true;
+      try {
+        await CCAdminApi.updateTicket(id, { status: 'resolvido' });
+        toast('Chamado concluído como resolvido.');
+        await refresh();
+      } catch (error) { toast(error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+
     $('#replyForm')?.addEventListener('submit', async event => {
       event.preventDefault(); const message = $('#replyMessage').value.trim(); if (!message) return;
       const button = $('#sendReply'); button.disabled = true;
       try {
-        const sent = await CCAdminApi.sendMessage(id, { message, internal:false });
+        const replyToMessageId = window.CCAttachments?.getReplyToMessageId?.() || null;
+        const sent = await CCAdminApi.sendMessage(id, { message, internal:false, replyToMessageId });
         $('#replyMessage').value = '';
+        window.CCAttachments?.clearReplyTarget?.();
         if (window.CCAttachments) {
           try { await window.CCAttachments.uploadFiles({ messageId: sent.message.id, input: $('#replyAttachments') }); }
           catch (uploadError) { toast(`Resposta enviada, mas o anexo falhou: ${uploadError.message}`, 'error'); }

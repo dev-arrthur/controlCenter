@@ -280,6 +280,27 @@ function serializeTicket(ticket) {
     lastMessageAt: ticket.lastMessageAt || ticket.createdAt
   };
 }
+function serializeMessages(messages) {
+  const byId = new Map(messages.map(message => [String(message._id), message]));
+  return messages.map(message => {
+    const parent = message.replyToMessageId ? byId.get(String(message.replyToMessageId)) : null;
+    return {
+      id: String(message._id),
+      authorType: message.authorType,
+      authorName: message.authorName,
+      message: message.message,
+      internal: message.internal === true,
+      createdAt: message.createdAt,
+      replyTo: parent ? {
+        id: String(parent._id),
+        authorType: parent.authorType,
+        authorName: parent.authorName,
+        message: cleanText(parent.message, 220),
+        internal: parent.internal === true
+      } : null
+    };
+  });
+}
 async function enrichTickets(database, tickets) {
   if (!tickets.length) return [];
   const orgIds = [...new Set(tickets.map(t => String(t.organizationId)).filter(Boolean))].map(id => new ObjectId(id));
@@ -430,7 +451,7 @@ async function actionTicket(req, res) {
 
   if (req.method === 'GET') {
     const messages = await session.db.collection('ticket_messages').find({ ticketId: id, organizationId: session.organization._id, internal: { $ne: true } }).sort({ createdAt: 1 }).toArray();
-    return ok(res, { ticket: serializeTicket(ticket), messages: messages.map(m => ({ id: String(m._id), authorType: m.authorType, authorName: m.authorName, message: m.message, createdAt: m.createdAt })) });
+    return ok(res, { ticket: serializeTicket(ticket), messages: serializeMessages(messages) });
   }
   if (req.method !== 'PATCH') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
   if (!assertSameOrigin(req)) return fail(res, 403, 'INVALID_ORIGIN', 'Origem não permitida.');
@@ -461,11 +482,18 @@ async function actionMessage(req, res) {
   const input = await parseBody(req);
   const message = cleanText(input.message, 5000);
   if (message.length < 2) return fail(res, 422, 'VALIDATION_ERROR', 'Digite uma mensagem.');
+  let replyTo = null;
+  if (input.replyToMessageId) {
+    const replyId = objectId(input.replyToMessageId);
+    if (!replyId) return fail(res, 422, 'INVALID_REPLY_TARGET', 'A mensagem selecionada para resposta é inválida.');
+    replyTo = await session.db.collection('ticket_messages').findOne({ _id: replyId, ticketId: id, organizationId: session.organization._id, internal: { $ne: true } });
+    if (!replyTo) return fail(res, 404, 'REPLY_TARGET_NOT_FOUND', 'A mensagem selecionada não pertence a este chamado ou não está disponível.');
+  }
   const now = new Date();
-  const inserted = await session.db.collection('ticket_messages').insertOne({ ticketId: id, organizationId: session.organization._id, authorId: session.user._id, authorType: 'client', authorName: session.user.name, message, internal: false, createdAt: now });
+  const inserted = await session.db.collection('ticket_messages').insertOne({ ticketId: id, organizationId: session.organization._id, authorId: session.user._id, authorType: 'client', authorName: session.user.name, message, replyToMessageId: replyTo?._id || null, internal: false, createdAt: now });
   await session.db.collection('tickets').updateOne({ _id: id }, { $set: { updatedAt: now, lastMessageAt: now, ...(ticket.status === 'aguardando_cliente' ? { status: 'aberto' } : {}) } });
   await audit(session.db, { organizationId: session.organization._id, userId: session.user._id, action: 'ticket.message.client', entityType: 'ticket', entityId: id, metadata: { ticketNumber: ticket.ticketNumber } });
-  return ok(res, { message: { id: String(inserted.insertedId), authorType: 'client', authorName: session.user.name, message, createdAt: now } }, 201);
+  return ok(res, { message: { id: String(inserted.insertedId), authorType: 'client', authorName: session.user.name, message, replyTo: replyTo ? { id: String(replyTo._id), authorName: replyTo.authorName, message: cleanText(replyTo.message, 220) } : null, createdAt: now } }, 201);
 }
 async function actionProfile(req, res) {
   const session = await requireClient(req, res);
@@ -628,7 +656,7 @@ async function actionAdminTicket(req, res) {
     return ok(res, {
       ticket: enriched[0],
       organization: org ? { id: String(org._id), name: org.name, code: org.code, supportTier: org.supportTier || '' } : null,
-      messages: messages.map(m => ({ id: String(m._id), authorType: m.authorType, authorName: m.authorName, message: m.message, internal: m.internal === true, createdAt: m.createdAt })),
+      messages: serializeMessages(messages),
       team: team.map(u => ({ id: String(u._id), name: u.name, email: u.email, role: u.role }))
     });
   }
@@ -654,7 +682,8 @@ async function actionAdminTicket(req, res) {
   if (Object.keys(update).length === 1) return fail(res, 422, 'NO_CHANGES', 'Nenhuma alteração foi informada.');
   await session.db.collection('tickets').updateOne({ _id: id }, { $set: update });
   const updated = await session.db.collection('tickets').findOne({ _id: id });
-  await audit(session.db, { organizationId: ticket.organizationId, userId: session.user._id, action: 'ticket.updated_by_admin', entityType: 'ticket', entityId: id, metadata: { ticketNumber: ticket.ticketNumber, changes: Object.keys(update).filter(k => k !== 'updatedAt') } });
+  const updateAuditAction = update.status === 'resolvido' && ticket.status !== 'resolvido' ? 'ticket.resolved_by_admin' : (update.status === 'fechado' && ticket.status !== 'fechado' ? 'ticket.closed_by_admin' : 'ticket.updated_by_admin');
+  await audit(session.db, { organizationId: ticket.organizationId, userId: session.user._id, action: updateAuditAction, entityType: 'ticket', entityId: id, metadata: { ticketNumber: ticket.ticketNumber, changes: Object.keys(update).filter(k => k !== 'updatedAt') } });
   return ok(res, { ticket: (await enrichTickets(session.db, [updated]))[0] });
 }
 async function actionAdminMessage(req, res) {
@@ -671,13 +700,22 @@ async function actionAdminMessage(req, res) {
   const internal = input.internal === true;
   if (message.length < 2) return fail(res, 422, 'VALIDATION_ERROR', 'Digite uma mensagem.');
   if (!internal && ticket.status === 'fechado') return fail(res, 409, 'TICKET_CLOSED', 'Reabra o chamado antes de responder ao cliente.');
+  let replyTo = null;
+  if (input.replyToMessageId) {
+    const replyId = objectId(input.replyToMessageId);
+    if (!replyId) return fail(res, 422, 'INVALID_REPLY_TARGET', 'A mensagem selecionada para resposta é inválida.');
+    const replyFilter = { _id: replyId, ticketId: id, organizationId: ticket.organizationId };
+    if (!internal) replyFilter.internal = { $ne: true };
+    replyTo = await session.db.collection('ticket_messages').findOne(replyFilter);
+    if (!replyTo) return fail(res, 404, 'REPLY_TARGET_NOT_FOUND', 'A mensagem selecionada não pertence a este chamado ou não pode ser citada nesta resposta.');
+  }
   const now = new Date();
-  const inserted = await session.db.collection('ticket_messages').insertOne({ ticketId: id, organizationId: ticket.organizationId, authorId: session.user._id, authorType: 'admin', authorName: session.user.name, message, internal, createdAt: now });
+  const inserted = await session.db.collection('ticket_messages').insertOne({ ticketId: id, organizationId: ticket.organizationId, authorId: session.user._id, authorType: 'admin', authorName: session.user.name, message, replyToMessageId: replyTo?._id || null, internal, createdAt: now });
   const ticketUpdate = { updatedAt: now, lastMessageAt: now };
   if (!internal && !['resolvido', 'fechado'].includes(ticket.status)) ticketUpdate.status = 'aguardando_cliente';
   await session.db.collection('tickets').updateOne({ _id: id }, { $set: ticketUpdate });
   await audit(session.db, { organizationId: ticket.organizationId, userId: session.user._id, action: internal ? 'ticket.note.internal' : 'ticket.message.admin', entityType: 'ticket', entityId: id, metadata: { ticketNumber: ticket.ticketNumber } });
-  return ok(res, { message: { id: String(inserted.insertedId), authorType: 'admin', authorName: session.user.name, message, internal, createdAt: now } }, 201);
+  return ok(res, { message: { id: String(inserted.insertedId), authorType: 'admin', authorName: session.user.name, message, internal, replyTo: replyTo ? { id: String(replyTo._id), authorName: replyTo.authorName, message: cleanText(replyTo.message, 220), internal: replyTo.internal === true } : null, createdAt: now } }, 201);
 }
 async function actionAdminClients(req, res) {
   const session = await requireAdmin(req, res);
