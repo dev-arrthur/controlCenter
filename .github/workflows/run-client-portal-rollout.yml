@@ -1,0 +1,133 @@
+name: Run client portal rollout
+
+on:
+  push:
+    branches:
+      - feat/client-ticket-portal
+    paths:
+      - '.github/workflows/run-client-portal-rollout.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/client-ticket-portal
+
+      - name: Extract prepared portal files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, re, tarfile, io
+
+          source = Path('.github/workflows/apply-client-portal.yml').read_text(encoding='utf-8')
+          marker = "cat > /tmp/ccportal.b64 <<'PAYLOAD'\n"
+          if marker not in source:
+              raise SystemExit('Portal payload marker not found')
+          payload = source.split(marker, 1)[1].split('\nPAYLOAD', 1)[0]
+          payload = ''.join(line.strip() for line in payload.splitlines())
+          if not re.fullmatch(r'[A-Za-z0-9+/=]+', payload):
+              raise SystemExit('Invalid portal payload')
+          archive = base64.b64decode(payload)
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as tar:
+              tar.extractall('.')
+          print('Portal files extracted.')
+          PY
+
+          # Keep a single Vercel serverless API entrypoint.
+          rm -rf api/_lib api/auth api/profile api/tickets
+          rm -f api/dashboard.js api/health.js
+
+      - name: Point every Area do Cliente link to the portal
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_area_links(path, target):
+              text = path.read_text(encoding='utf-8')
+              def repl(match):
+                  tag = match.group(0)
+                  plain = re.sub(r'<[^>]+>', ' ', tag)
+                  plain = re.sub(r'\s+', ' ', plain).strip()
+                  if 'Área do Cliente' not in plain:
+                      return tag
+                  if re.search(r'href="[^"]*"', tag):
+                      return re.sub(r'href="[^"]*"', f'href="{target}"', tag, count=1)
+                  return tag
+              text = re.sub(r'<a\b[^>]*>.*?</a>', repl, text, flags=re.S | re.I)
+              path.write_text(text, encoding='utf-8')
+
+          replace_area_links(Path('index.html'), 'workspace/client/loginClient.html')
+
+          for path in [
+              Path('pages/company/index.html'),
+              Path('pages/clients/index.html'),
+              Path('pages/contact/index.html'),
+              Path('pages/contents/index.html'),
+              *sorted(Path('pages/solutions').glob('*.html')),
+          ]:
+              replace_area_links(path, '../../workspace/client/loginClient.html')
+
+          for path in sorted(Path('pages/contents/articles').glob('*.html')):
+              replace_area_links(path, '../../../workspace/client/loginClient.html')
+
+          print('Area do Cliente links updated.')
+          PY
+
+      - name: Install and validate Node portal
+        shell: bash
+        run: |
+          npm install --ignore-scripts
+          npm run check
+          node -c api/portal.js
+          node -c workspace/client/assets/js/api.js
+          node -c workspace/client/assets/js/portal.js
+          node -e "const handler=require('./api/portal'); if(typeof handler!=='function') process.exit(1); console.log('API handler OK')"
+
+      - name: Validate portal links and security basics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          pages = [Path('index.html'), Path('pages/company/index.html'), Path('pages/clients/index.html'), Path('pages/contact/index.html'), Path('pages/contents/index.html'), *Path('pages/solutions').glob('*.html'), *Path('pages/contents/articles').glob('*.html')]
+          failures = []
+          for path in pages:
+              text = path.read_text(encoding='utf-8')
+              for tag in re.findall(r'<a\b[^>]*>.*?</a>', text, flags=re.S | re.I):
+                  plain = re.sub(r'<[^>]+>', ' ', tag)
+                  if 'Área do Cliente' in re.sub(r'\s+', ' ', plain):
+                      href = re.search(r'href="([^"]+)"', tag)
+                      if not href or 'workspace/client/loginClient.html' not in href.group(1):
+                          failures.append(f'{path}: {href.group(1) if href else "sem href"}')
+          if failures:
+              raise SystemExit('Invalid client links:\n' + '\n'.join(failures))
+
+          api = Path('api/portal.js').read_text(encoding='utf-8')
+          required = ['HttpOnly', 'SameSite=Lax', 'bcrypt.hash(newPassword, 12)', 'organizationId', 'auth_attempts', 'audit_logs']
+          missing = [item for item in required if item not in api]
+          if missing:
+              raise SystemExit('Missing security markers: ' + ', '.join(missing))
+          print('Portal links and security basics validated.')
+          PY
+
+      - name: Commit portal implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .env.example .gitignore PORTAL_CLIENTE.md package.json package-lock.json vercel.json api scripts workspace index.html pages
+          if git diff --cached --quiet; then
+            echo 'No implementation changes to commit.'
+            exit 0
+          fi
+          git commit -m 'feat: criar portal completo de chamados para clientes'
+          git push origin HEAD:feat/client-ticket-portal
