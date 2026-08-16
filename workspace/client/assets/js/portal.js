@@ -133,7 +133,7 @@
 
   function renderMessages(messages) {
     const wrap=$('#messages');
-    wrap.innerHTML=messages.map(msg=>`<div class="message ${msg.authorType==='client'?'client':''}" data-message-id="${escapeHtml(msg.id)}"><div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div><div class="message-bubble"><div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${date(msg.createdAt,true)}</span></div><p>${escapeHtml(msg.message)}</p></div></div>`).join('');
+    wrap.innerHTML=messages.map(msg=>`<div class="message ${msg.authorType==='client'?'client':''}" data-message-id="${escapeHtml(msg.id)}"><div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div><div class="message-bubble"><div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${date(msg.createdAt,true)}</span></div>${msg.replyTo?`<button class="message-reply-reference" type="button" data-scroll-message="${escapeHtml(msg.replyTo.id)}"><small><i class="bi bi-reply"></i> Respondendo a ${escapeHtml(msg.replyTo.authorName)}</small><span>${escapeHtml(msg.replyTo.message)}</span></button>`:''}<p>${escapeHtml(msg.message)}</p><div class="message-actions"><button class="message-reply-action" type="button" data-reply-message-id="${escapeHtml(msg.id)}" data-reply-author="${escapeHtml(msg.authorName)}" data-reply-excerpt="${escapeHtml(msg.message.slice(0,220))}"><i class="bi bi-reply"></i>Responder</button></div></div></div>`).join('');
     wrap.scrollTop=wrap.scrollHeight;
   }
 
@@ -154,7 +154,7 @@
     $('#replyForm')?.addEventListener('submit',async e=>{
       e.preventDefault();const textarea=$('#replyMessage');const msg=textarea.value.trim();if(!msg)return;const btn=$('#sendReply');btn.disabled=true;
       try{
-        const sent=await CCApi.sendMessage(id,msg);textarea.value='';
+        const replyToMessageId=window.CCAttachments?.getReplyToMessageId?.()||null;const sent=await CCApi.sendMessage(id,{message:msg,replyToMessageId});textarea.value='';window.CCAttachments?.clearReplyTarget?.();
         if(window.CCAttachments){try{await window.CCAttachments.uploadFiles({messageId:sent.message.id,input:$('#replyAttachments')});}catch(uploadError){toast(`Mensagem enviada, mas o anexo falhou: ${uploadError.message}`,'error');}}
         await refresh();
       }catch(error){toast(error.message,'error')}finally{btn.disabled=false}
