@@ -1,0 +1,46 @@
+name: Ticket replies zoom resolve
+
+on:
+  push:
+    branches:
+      - feat/ticket-replies-zoom-resolve
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply patch
+        run: python3 scripts/patch-replies-zoom-resolve.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate
+        run: |
+          npm run check
+          node --check api/portal.js
+          node --check workspace/client/assets/js/api.js
+          node --check workspace/client/assets/js/portal.js
+          node --check workspace/admin/assets/js/admin.js
+          node --check workspace/shared/ticketEnterprise.js
+          grep -q 'replyToMessageId' api/portal.js
+          grep -q 'message-reply-action' workspace/client/assets/js/portal.js
+          grep -q 'message-reply-action' workspace/admin/assets/js/admin.js
+          grep -q 'data-image-zoom-in' workspace/shared/ticketEnterprise.js
+          grep -q 'id="resolveTicket"' workspace/admin/ticketAdmin.html
+          grep -q 'ticket.resolved_by_admin' api/portal.js
+      - name: Commit validated changes and remove temporary files
+        run: |
+          rm -f scripts/patch-replies-zoom-resolve.py .github/workflows/ticket-replies-zoom-resolve.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: adicionar respostas zoom e conclusão de chamados"
+          git push
