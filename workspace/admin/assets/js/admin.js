@@ -214,6 +214,7 @@
     const id = new URLSearchParams(location.search).get('id');
     if (!id) { location.replace('ticketsAdmin.html'); return; }
     let first = true;
+    let currentAssigneeId = '';
     const refresh = async () => {
       const data = await CCAdminApi.ticket(id);
       const ticket = data.ticket;
@@ -236,7 +237,8 @@
       }
       $('#statusControl').value = ticket.status;
       $('#priorityControl').value = ticket.priority;
-      $('#assigneeControl').value = ticket.assignedTo || '';
+      currentAssigneeId = ticket.assignedTo || '';
+      $('#assigneeControl').value = currentAssigneeId;
       if (window.CCAttachments) await window.CCAttachments.refresh();
       return ticket;
     };
@@ -245,12 +247,34 @@
     window.dispatchEvent(new CustomEvent('cc:ticket-ready', { detail: { id } }));
 
     $('#saveTicketControls')?.addEventListener('click', async () => {
-      const button = $('#saveTicketControls'); button.disabled = true;
+      const button = $('#saveTicketControls');
+      const nextAssigneeId = $('#assigneeControl').value || '';
+      const assigneeChanged = nextAssigneeId !== currentAssigneeId;
+      let reason = '';
+      let unassign = false;
+      if (assigneeChanged && currentAssigneeId) {
+        reason = $('#transferReason')?.value.trim() || '';
+        unassign = !nextAssigneeId;
+        if (reason.length < 3) {
+          toast(unassign ? 'Informe o motivo para deixar o chamado sem responsável.' : 'Informe o motivo da transferência antes de trocar o responsável.', 'error');
+          $('#transferReason')?.focus();
+          return;
+        }
+      }
+      button.disabled = true;
       try {
         await CCAdminApi.updateTicket(id, { status: $('#statusControl').value, priority: $('#priorityControl').value });
-        toast('Chamado atualizado.'); await refresh();
-      } catch (error) { toast(error.message, 'error'); }
-      finally { button.disabled = false; }
+        if (assigneeChanged) {
+          await CCAdminApi.transferTicket(id, { assignedTo: nextAssigneeId, reason, unassign });
+          if ($('#transferReason')) $('#transferReason').value = '';
+        }
+        toast(assigneeChanged ? 'Chamado atualizado e responsável salvo.' : 'Chamado atualizado.');
+        await refresh();
+        if (typeof window.CCReloadTransferPanel === 'function') await window.CCReloadTransferPanel();
+      } catch (error) {
+        toast(error.message, 'error');
+        await refresh().catch(() => {});
+      } finally { button.disabled = false; }
     });
     $('#replyForm')?.addEventListener('submit', async event => {
       event.preventDefault(); const message = $('#replyMessage').value.trim(); if (!message) return;
@@ -327,7 +351,7 @@
         </tr>`).join('') : '<tr><td colspan="5"><div class="empty-state"><p>Nenhum usuário cadastrado.</p></div></td></tr>';
         $$('.js-toggle-user').forEach(button => button.onclick = async () => { try { await CCAdminApi.updateUser(button.dataset.id, { active: button.dataset.active !== 'true' }); toast('Usuário atualizado.'); await loadUsers(); } catch (error) { toast(error.message, 'error'); } });
         $$('.js-reset-user').forEach(button => button.onclick = async () => {
-          const newPassword = prompt('Digite a nova senha temporária (mínimo 10 caracteres, com letras e números):');
+          const newPassword = prompt('Digite a nova senha temporária (mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo):');
           if (!newPassword) return;
           try { await CCAdminApi.updateUser(button.dataset.id, { newPassword }); toast('Senha do usuário redefinida. As sessões anteriores foram invalidadas.'); await loadUsers(); }
           catch (error) { toast(error.message, 'error'); }

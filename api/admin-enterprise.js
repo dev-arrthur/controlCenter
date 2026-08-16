@@ -25,7 +25,7 @@ function generatedPassword(){return `${crypto.randomBytes(16).toString('base64ur
 function strongPassword(value){return typeof value==='string'&&value.length>=8&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\d/.test(value)&&/[^A-Za-z0-9]/.test(value);}
 function publicTeamUser(u){return{id:String(u._id),name:u.name,email:u.email,role:u.role,active:u.active!==false,forcePasswordChange:u.forcePasswordChange===true,lastLoginAt:u.lastLoginAt||null,createdAt:u.createdAt||null};}
 async function limit(session,req,scope,max,windowMs){return enforceRateLimit(session.db,{scope,subject:`${String(session.user._id)}:${requestIp(req)}`,limit:max,windowMs});}
-async function requireSession(req,res){const session=await authenticateCookieHeader(req.headers.cookie||'');if(!session||session.kind!=='admin')return fail(res,401,'UNAUTHENTICATED','Sessão administrativa expirada ou inválida.');if(session.user.forcePasswordChange===true)return fail(res,428,'PASSWORD_CHANGE_REQUIRED','Redefina sua senha antes de continuar.');return session;}
+async function requireSession(req,res){const session=await authenticateCookieHeader(req.headers.cookie||'');if(!session||session.kind!=='admin'){fail(res,401,'UNAUTHENTICATED','Sessão administrativa expirada ou inválida.');return null;}if(session.user.forcePasswordChange===true){fail(res,428,'PASSWORD_CHANGE_REQUIRED','Redefina sua senha antes de continuar.');return null;}return session;}
 async function ensureLastAdminSafety(db,target,nextRole,nextActive){if(target.role!=='admin')return true;const removingAdmin=nextRole&&nextRole!=='admin';const deactivating=nextActive===false;if(!removingAdmin&&!deactivating)return true;const count=await db.collection('users').countDocuments({_id:{$ne:target._id},role:'admin',active:true});return count>0;}
 
 async function team(req,res,session){
@@ -83,27 +83,30 @@ async function transfer(req,res,session){
   const ticket=await authorizeTicket(session,id);if(!ticket)return fail(res,404,'TICKET_NOT_FOUND','Chamado não encontrado.');
   if(req.method==='GET'){
     const history=await session.db.collection('ticket_transfers').find({ticketId:ticket._id}).sort({createdAt:-1}).limit(30).toArray();
-    return ok(res,{transfers:history.map(item=>({id:String(item._id),fromId:item.fromId?String(item.fromId):null,fromName:item.fromName||'',toId:item.toId?String(item.toId):null,toName:item.toName||'',byId:String(item.byId),byName:item.byName,reason:item.reason,createdAt:item.createdAt}))});
+    return ok(res,{transfers:history.map(item=>({id:String(item._id),fromId:item.fromId?String(item.fromId):null,fromName:item.fromName||'',toId:item.toId?String(item.toId):null,toName:item.toName||'',byId:String(item.byId),byName:item.byName,reason:item.reason,eventType:item.eventType||'transfer',eventLabel:item.eventLabel||'Transferência',createdAt:item.createdAt}))});
   }
   if(req.method!=='POST')return fail(res,405,'METHOD_NOT_ALLOWED','Método não permitido.');
   if(!sameOrigin(req))return fail(res,403,'INVALID_ORIGIN','Origem não permitida.');
-  const rate=await limit(session,req,'ticket-transfer',40,10*60*1000);if(!rate.allowed){res.setHeader('Retry-After',String(rate.retryAfter));return fail(res,429,'RATE_LIMITED','Muitas transferências em pouco tempo.');}
-  const input=await parseBody(req);const assignedId=ObjectId.isValid(input.assignedTo)?new ObjectId(input.assignedTo):null;const reason=clean(input.reason,500);
-  if(!assignedId)return fail(res,422,'INVALID_ASSIGNEE','Selecione o novo responsável.');
-  if(reason.length<3)return fail(res,422,'TRANSFER_REASON_REQUIRED','Informe o motivo da transferência.');
-  if(ticket.assignedTo&&String(ticket.assignedTo)===String(assignedId))return fail(res,409,'ALREADY_ASSIGNED','Este integrante já é o responsável pelo chamado.');
-  const assignee=await session.db.collection('users').findOne({_id:assignedId,role:{$in:ADMIN_ROLES},active:true});if(!assignee)return fail(res,422,'INVALID_ASSIGNEE','O novo responsável não está ativo na equipe.');
+  const rate=await limit(session,req,'ticket-transfer',40,10*60*1000);if(!rate.allowed){res.setHeader('Retry-After',String(rate.retryAfter));return fail(res,429,'RATE_LIMITED','Muitas alterações de responsável em pouco tempo.');}
+  const input=await parseBody(req);const reason=clean(input.reason,500);const wantsUnassign=input.unassign===true;let assignee=null;
+  if(!wantsUnassign){const assignedId=ObjectId.isValid(input.assignedTo)?new ObjectId(input.assignedTo):null;if(!assignedId)return fail(res,422,'INVALID_ASSIGNEE','Selecione o novo responsável.');if(ticket.assignedTo&&String(ticket.assignedTo)===String(assignedId))return fail(res,409,'ALREADY_ASSIGNED','Este integrante já é o responsável pelo chamado.');assignee=await session.db.collection('users').findOne({_id:assignedId,role:{$in:ADMIN_ROLES},active:true});if(!assignee)return fail(res,422,'INVALID_ASSIGNEE','O novo responsável não está ativo na equipe.');}
+  else if(!ticket.assignedTo)return fail(res,409,'ALREADY_UNASSIGNED','Este chamado já está sem responsável.');
+  const isInitialAssignment=!ticket.assignedTo&&!wantsUnassign;
+  if(!isInitialAssignment&&reason.length<3)return fail(res,422,'TRANSFER_REASON_REQUIRED',wantsUnassign?'Informe o motivo para deixar o chamado sem responsável.':'Informe o motivo da transferência.');
+  const effectiveReason=reason||(isInitialAssignment?'Atribuição inicial pelo painel administrativo.':'Alteração de responsável.');
   const previous=ticket.assignedTo?await session.db.collection('users').findOne({_id:ticket.assignedTo}):null;const now=new Date();
-  await session.db.collection('tickets').updateOne({_id:ticket._id},{$set:{assignedTo:assignee._id,assignedAt:now,assignedBy:session.user._id,updatedAt:now,...(ticket.status==='aberto'?{status:'em_atendimento'}:{})}});
-  const log={ticketId:ticket._id,organizationId:ticket.organizationId,fromId:previous?previous._id:null,fromName:previous?.name||'',toId:assignee._id,toName:assignee.name,byId:session.user._id,byName:session.user.name,reason,createdAt:now};
+  const eventType=wantsUnassign?'unassign':(isInitialAssignment?'assign':'transfer');const eventLabel=wantsUnassign?'Desatribuição':(isInitialAssignment?'Atribuição inicial':'Transferência');
+  const set={assignedTo:assignee?assignee._id:null,assignedAt:assignee?now:null,assignedBy:session.user._id,updatedAt:now};if(assignee&&ticket.status==='aberto')set.status='em_atendimento';
+  await session.db.collection('tickets').updateOne({_id:ticket._id},{$set:set});
+  const log={ticketId:ticket._id,organizationId:ticket.organizationId,fromId:previous?previous._id:null,fromName:previous?.name||'',toId:assignee?assignee._id:null,toName:assignee?.name||'Não atribuído',byId:session.user._id,byName:session.user.name,reason:effectiveReason,eventType,eventLabel,createdAt:now};
   const inserted=await session.db.collection('ticket_transfers').insertOne(log);log._id=inserted.insertedId;
-  await audit(session.db,{organizationId:ticket.organizationId,userId:session.user._id,action:'ticket.transferred',entityType:'ticket',entityId:ticket._id,metadata:{ticketNumber:ticket.ticketNumber,from:previous?hashSensitive(String(previous._id),'user-id'):null,to:hashSensitive(String(assignee._id),'user-id'),reason}});
-  return ok(res,{transfer:{id:String(log._id),fromName:log.fromName,toName:log.toName,byName:log.byName,reason,createdAt:now}});
+  await audit(session.db,{organizationId:ticket.organizationId,userId:session.user._id,action:`ticket.${eventType}`,entityType:'ticket',entityId:ticket._id,metadata:{ticketNumber:ticket.ticketNumber,from:previous?hashSensitive(String(previous._id),'user-id'):null,to:assignee?hashSensitive(String(assignee._id),'user-id'):null,reason:effectiveReason}});
+  return ok(res,{transfer:{id:String(log._id),fromName:log.fromName,toName:log.toName,byName:log.byName,reason:effectiveReason,eventType,eventLabel,createdAt:now},assignment:{assignedTo:assignee?String(assignee._id):null,assignedName:assignee?.name||''}});
 }
 
 module.exports=async function handler(req,res){
   try{
-    const session=await requireSession(req,res);if(!session||session.ok===false)return;
+    const session=await requireSession(req,res);if(!session)return;
     const general=await limit(session,req,'admin-enterprise',180,60*1000);if(!general.allowed){res.setHeader('Retry-After',String(general.retryAfter));return fail(res,429,'RATE_LIMITED','Muitas requisições. Aguarde alguns instantes.');}
     const action=clean(req.query.action,40).toLowerCase();
     if(action==='team')return team(req,res,session);

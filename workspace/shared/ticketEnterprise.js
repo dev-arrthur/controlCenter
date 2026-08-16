@@ -73,6 +73,7 @@
       uploaded.push(result.attachment);
     }
     input.value = '';
+    renderSelectedFiles(input);
     await refreshAttachments();
     return uploaded;
   }
@@ -88,24 +89,50 @@
       <i class="bi bi-file-earmark-pdf"></i><span><strong>${escapeHtml(item.fileName)}</strong><small>${formatBytes(item.size)} • PDF</small></span><i class="bi bi-box-arrow-up-right"></i>
     </a>`;
   }
+  function attachmentSignature(items) {
+    return items.map(item => `${item.id}:${item.sha256 || ''}:${item.archived ? '1' : '0'}`).join('|');
+  }
   function decorateMessages() {
-    document.querySelectorAll('.message-attachments[data-enterprise="1"]').forEach(el => el.remove());
     const grouped = new Map();
     for (const item of attachments) {
       if (!item.messageId) continue;
       if (!grouped.has(item.messageId)) grouped.set(item.messageId, []);
       grouped.get(item.messageId).push(item);
     }
-    for (const [messageId, items] of grouped) {
-      const message = document.querySelector(`.message[data-message-id="${CSS.escape(messageId)}"]`);
-      const bubble = message?.querySelector('.message-bubble');
-      if (!bubble) continue;
-      const wrap = document.createElement('div');
-      wrap.className = 'message-attachments';
-      wrap.dataset.enterprise = '1';
+    document.querySelectorAll('.message[data-message-id]').forEach(message => {
+      const messageId = message.dataset.messageId || '';
+      const bubble = message.querySelector('.message-bubble');
+      if (!bubble) return;
+      const items = grouped.get(messageId) || [];
+      let wrap = bubble.querySelector(':scope > .message-attachments[data-enterprise="1"]');
+      if (!items.length) { if (wrap) wrap.remove(); return; }
+      const signature = attachmentSignature(items);
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.className = 'message-attachments';
+        wrap.dataset.enterprise = '1';
+        bubble.appendChild(wrap);
+      }
+      if (wrap.dataset.signature === signature) return;
+      wrap.dataset.signature = signature;
       wrap.innerHTML = items.map(attachmentMarkup).join('');
-      bubble.appendChild(wrap);
-    }
+    });
+  }
+  function renderSelectedFiles(input) {
+    if (!input) return;
+    let box = input.parentElement?.querySelector('.selected-attachments');
+    const files = [...(input.files || [])];
+    if (!files.length) { if (box) box.remove(); return; }
+    if (!box) { box = document.createElement('div'); box.className = 'selected-attachments'; input.insertAdjacentElement('afterend', box); }
+    box.innerHTML = files.map(file => `<span><i class="bi bi-paperclip"></i>${escapeHtml(file.name)} <small>${formatBytes(file.size)}</small></span>`).join('');
+  }
+  function bindAttachmentInputs() {
+    document.querySelectorAll('.attachment-picker input[type=file]').forEach(input => {
+      if (input.dataset.attachmentBound === '1') return;
+      input.dataset.attachmentBound = '1';
+      input.addEventListener('change', () => renderSelectedFiles(input));
+      renderSelectedFiles(input);
+    });
   }
   async function refreshAttachments() {
     try {
@@ -130,7 +157,7 @@
   }
   async function refreshTicket() {
     if (typeof global.CCRefreshTicket === 'function') {
-      try { await global.CCRefreshTicket(); } catch {}
+      try { await global.CCRefreshTicket(); return; } catch {}
     }
     await refreshAttachments();
   }
@@ -181,10 +208,8 @@
 
   global.CCAttachments = { uploadFiles, refresh:refreshAttachments, decorate:decorateMessages };
 
-  const observer = new MutationObserver(() => decorateMessages());
   document.addEventListener('DOMContentLoaded', () => {
-    const messages = document.getElementById('messages');
-    if (messages) observer.observe(messages, { childList:true, subtree:true });
+    bindAttachmentInputs();
     refreshAttachments();
     connectRealtime();
   });
