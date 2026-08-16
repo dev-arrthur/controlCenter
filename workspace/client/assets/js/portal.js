@@ -61,7 +61,8 @@
   }
 
   async function initLogin() {
-    try { await CCApi.me(); location.replace(DASH); return; } catch {}
+    // Não consulta /me na tela de login: usuário sem sessão é um estado normal
+    // e não deve gerar 401 desnecessário no console antes da autenticação.
     const params=new URLSearchParams(location.search);
     if(params.get('expired')) { const alert=$('#loginAlert'); if(alert){alert.textContent='Sua sessão expirou. Entre novamente para continuar.';alert.classList.add('show')} }
     $('#togglePassword')?.addEventListener('click',()=>{const input=$('#password');input.type=input.type==='password'?'text':'password';$('#togglePassword i').className=`bi ${input.type==='password'?'bi-eye':'bi-eye-slash'}`});

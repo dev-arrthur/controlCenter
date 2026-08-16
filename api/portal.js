@@ -58,13 +58,22 @@ async function parseBody(req) {
   try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
 }
 function secret() {
-  const value = process.env.JWT_SECRET;
-  if (!value || value.length < 32) {
-    const error = new Error('JWT_SECRET_NOT_CONFIGURED');
-    error.code = 'JWT_SECRET_NOT_CONFIGURED';
-    throw error;
+  const configured = process.env.JWT_SECRET;
+  if (configured && configured.length >= 32) return configured;
+
+  // Fallback operacional: se a hospedagem ainda não recebeu JWT_SECRET,
+  // deriva uma chave estável a partir do segredo já obrigatório do MongoDB.
+  // Isso evita indisponibilidade do login, sem expor a connection string.
+  const mongoSecret = process.env.MONGODB_URI;
+  if (mongoSecret) {
+    return crypto.createHash('sha256')
+      .update(`controlcenter-portal:${DB_NAME}:${mongoSecret}`)
+      .digest('hex');
   }
-  return value;
+
+  const error = new Error('PORTAL_SECRETS_NOT_CONFIGURED');
+  error.code = 'PORTAL_SECRETS_NOT_CONFIGURED';
+  throw error;
 }
 function parseCookies(req) {
   return (req.headers.cookie || '').split(';').reduce((out, part) => {
@@ -839,7 +848,7 @@ module.exports = async function handler(req, res) {
     return await routes[action](req, res);
   } catch (error) {
     console.error('PORTAL_API_ERROR', action, error);
-    if (error.code === 'MONGODB_URI_NOT_CONFIGURED' || error.code === 'JWT_SECRET_NOT_CONFIGURED') return fail(res, 503, 'PORTAL_NOT_CONFIGURED', 'O portal ainda não foi configurado no ambiente de hospedagem.');
+    if (error.code === 'MONGODB_URI_NOT_CONFIGURED' || error.code === 'JWT_SECRET_NOT_CONFIGURED' || error.code === 'PORTAL_SECRETS_NOT_CONFIGURED') return fail(res, 503, 'PORTAL_NOT_CONFIGURED', 'O portal ainda não foi configurado no ambiente de hospedagem.');
     if (error.code === 11000) return fail(res, 409, 'DUPLICATE_DATA', 'Já existe um cadastro com estes dados.');
     return fail(res, 500, 'INTERNAL_ERROR', 'Não foi possível concluir a operação agora.');
   }
