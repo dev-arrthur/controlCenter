@@ -1,0 +1,66 @@
+name: Apply Vercel portal runtime fix
+
+on:
+  push:
+    branches:
+      - fix/vercel-portal-runtime-config
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/vercel-portal-runtime-config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Apply runtime config fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          api = Path('api/portal.js')
+          text = api.read_text()
+          old = """function secret() {\n  const value = process.env.JWT_SECRET;\n  if (!value || value.length < 32) {\n    const error = new Error('JWT_SECRET_NOT_CONFIGURED');\n    error.code = 'JWT_SECRET_NOT_CONFIGURED';\n    throw error;\n  }\n  return value;\n}"""
+          new = """function secret() {\n  const configured = process.env.JWT_SECRET;\n  if (configured && configured.length >= 32) return configured;\n\n  // Fallback operacional: se a hospedagem ainda não recebeu JWT_SECRET,\n  // deriva uma chave estável a partir do segredo já obrigatório do MongoDB.\n  // Isso evita indisponibilidade do login, sem expor a connection string.\n  const mongoSecret = process.env.MONGODB_URI;\n  if (mongoSecret) {\n    return crypto.createHash('sha256')\n      .update(`controlcenter-portal:${DB_NAME}:${mongoSecret}`)\n      .digest('hex');\n  }\n\n  const error = new Error('PORTAL_SECRETS_NOT_CONFIGURED');\n  error.code = 'PORTAL_SECRETS_NOT_CONFIGURED';\n  throw error;\n}"""
+          if old not in text:
+              raise SystemExit('secret() block not found')
+          text = text.replace(old, new)
+          text = text.replace("if (error.code === 'MONGODB_URI_NOT_CONFIGURED' || error.code === 'JWT_SECRET_NOT_CONFIGURED')", "if (error.code === 'MONGODB_URI_NOT_CONFIGURED' || error.code === 'JWT_SECRET_NOT_CONFIGURED' || error.code === 'PORTAL_SECRETS_NOT_CONFIGURED')")
+          api.write_text(text)
+
+          portal = Path('workspace/client/assets/js/portal.js')
+          text = portal.read_text()
+          old = """  async function initLogin() {\n    try { await CCApi.me(); location.replace(DASH); return; } catch {}\n    const params=new URLSearchParams(location.search);"""
+          new = """  async function initLogin() {\n    // Não consulta /me na tela de login: usuário sem sessão é um estado normal\n    // e não deve gerar 401 desnecessário no console antes da autenticação.\n    const params=new URLSearchParams(location.search);"""
+          if old not in text:
+              raise SystemExit('initLogin block not found')
+          portal.write_text(text.replace(old, new))
+
+          env = Path('.env.example')
+          env_text = env.read_text()
+          env_text = env_text.replace('# Gere uma chave longa e aleatória (mínimo recomendado: 32 bytes)\nJWT_SECRET=troque-por-uma-chave-segura-com-no-minimo-32-bytes', '# Recomendado em produção. Se ausente, o backend deriva uma chave estável do MONGODB_URI.\nJWT_SECRET=troque-por-uma-chave-segura-com-no-minimo-32-bytes')
+          env.write_text(env_text)
+          PY
+      - run: npm ci
+      - run: npm run check
+      - run: node --check api/portal.js
+      - run: node --check workspace/client/assets/js/portal.js
+      - name: Verify fix
+        run: |
+          grep -q "controlcenter-portal:${DB_NAME}" api/portal.js
+          ! grep -q "await CCApi.me(); location.replace(DASH)" workspace/client/assets/js/portal.js
+      - name: Commit validated fix
+        run: |
+          git config user.name "devarrthur"
+          git config user.email "dev.arrthur@gmail.com"
+          git add api/portal.js workspace/client/assets/js/portal.js .env.example
+          if ! git diff --cached --quiet; then
+            git commit -m "fix: tornar configuração do portal resiliente na Vercel"
+            git push origin HEAD:fix/vercel-portal-runtime-config
+          fi
