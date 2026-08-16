@@ -1,0 +1,117 @@
+tring(guard.retryAfter || 900));
+    return fail(res, 429, 'TOO_MANY_ATTEMPTS', 'Muitas tentativas de acesso. Aguarde alguns minutos.');
+  }
+
+  const matches = await database.collection('users').find({ email, role: { $in: CLIENT_ROLES }, active: true }).limit(2).toArray();
+  if (matches.length > 1) return fail(res, 409, 'ACCOUNT_AMBIGUOUS', 'Este e-mail está vinculado a mais de uma empresa. Fale com a ControlCenter para ajustar o acesso.');
+  const user = matches[0] || null;
+  const organization = user ? await database.collection('organizations').findOne({ _id: user.organizationId, active: { $ne: false } }) : null;
+  const valid = user && organization ? await bcrypt.compare(password, user.passwordHash || '') : false;
+  if (!user || !organization || !valid) {
+    await loginFailure(database, guard.key);
+    return fail(res, 401, 'INVALID_CREDENTIALS', 'E-mail ou senha inválidos.');
+  }
+
+  await database.collection('auth_attempts').deleteOne({ _id: guard.key });
+  await database.collection('users').updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date(), updatedAt: new Date() } });
+  setCookie(res, CLIENT_COOKIE, clientToken(user));
+  await audit(database, { organizationId: organization._id, userId: user._id, action: 'auth.client.login', entityType: 'user', entityId: user._id });
+  return ok(res, { user: publicClientUser(user, organization) });
+}
+async function actionMe(req, res) {
+  if (req.method !== 'GET') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  const session = await requireClient(req, res);
+  if (!session) return;
+  return ok(res, { user: publicClientUser(session.user, session.organization) });
+}
+async function actionLogout(req, res) {
+  if (req.method !== 'POST') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  clearCookie(res, CLIENT_COOKIE);
+  return ok(res);
+}
+async function actionDashboard(req, res) {
+  if (req.method !== 'GET') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  const session = await requireClient(req, res);
+  if (!session) return;
+  const tickets = session.db.collection('tickets');
+  const oid = session.organization._id;
+  const [abertos, emAtendimento, aguardandoCliente, recentes] = await Promise.all([
+    tickets.countDocuments({ organizationId: oid, status: 'aberto' }),
+    tickets.countDocuments({ organizationId: oid, status: 'em_atendimento' }),
+    tickets.countDocuments({ organizationId: oid, status: 'aguardando_cliente' }),
+    tickets.find({ organizationId: oid }).sort({ updatedAt: -1 }).limit(6).toArray()
+  ]);
+  return ok(res, { stats: { abertos, emAtendimento, aguardandoCliente, ativos: abertos + emAtendimento + aguardandoCliente }, recentTickets: recentes.map(serializeTicket) });
+}
+async function actionTickets(req, res) {
+  const session = await requireClient(req, res);
+  if (!session) return;
+  if (req.method === 'GET') {
+    const status = cleanText(req.query.status || '', 30).toLowerCase();
+    const search = cleanText(req.query.search || '', 100);
+    const page = Math.max(1, Math.min(Number(req.query.page || 1), 1000));
+    const limit = 20;
+    const filter = { organizationId: session.organization._id };
+    if (status && STATUSES.includes(status)) filter.status = status;
+    if (search) {
+      const regex = escapeRegex(search);
+      filter.$or = [{ ticketNumber: { $regex: regex, $options: 'i' } }, { title: { $regex: regex, $options: 'i' } }];
+    }
+    const [items, total] = await Promise.all([
+      session.db.collection('tickets').find(filter).sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+      session.db.collection('tickets').countDocuments(filter)
+    ]);
+    return ok(res, { tickets: items.map(serializeTicket), pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  }
+  if (req.method !== 'POST') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  if (!assertSameOrigin(req)) return fail(res, 403, 'INVALID_ORIGIN', 'Origem não permitida.');
+  const input = await parseBody(req);
+  const title = cleanText(input.title, 140);
+  const description = cleanText(input.description, 5000);
+  const category = cleanText(input.category, 30).toLowerCase();
+  const priority = cleanText(input.priority, 20).toLowerCase();
+  const errors = {};
+  if (title.length < 5) errors.title = 'Informe um título com pelo menos 5 caracteres.';
+  if (description.length < 15) errors.description = 'Descreva o chamado com pelo menos 15 caracteres.';
+  if (!CATEGORIES.includes(category)) errors.category = 'Categoria inválida.';
+  if (!PRIORITIES.includes(priority)) errors.priority = 'Prioridade inválida.';
+  if (Object.keys(errors).length) return fail(res, 422, 'VALIDATION_ERROR', 'Revise os campos do chamado.', errors);
+
+  const now = new Date();
+  const ticket = {
+    ticketNumber: await nextTicketNumber(session.db),
+    organizationId: session.organization._id,
+    createdBy: session.user._id,
+    requester: { userId: String(session.user._id), name: session.user.name, email: session.user.email },
+    title,
+    description,
+    category,
+    priority,
+    status: 'aberto',
+    assignedTo: null,
+    channel: 'portal_cliente',
+    createdAt: now,
+    updatedAt: now,
+    lastMessageAt: now
+  };
+  const inserted = await session.db.collection('tickets').insertOne(ticket);
+  ticket._id = inserted.insertedId;
+  await session.db.collection('ticket_messages').insertOne({ ticketId: ticket._id, organizationId: session.organization._id, authorId: session.user._id, authorType: 'client', authorName: session.user.name, message: description, internal: false, createdAt: now });
+  await audit(session.db, { organizationId: session.organization._id, userId: session.user._id, action: 'ticket.created', entityType: 'ticket', entityId: ticket._id, metadata: { ticketNumber: ticket.ticketNumber, priority, category } });
+  return ok(res, { ticket: serializeTicket(ticket) }, 201);
+}
+async function actionTicket(req, res) {
+  const session = await requireClient(req, res);
+  if (!session) return;
+  const id = objectId(req.query.id);
+  if (!id) return fail(res, 400, 'INVALID_TICKET', 'Chamado inválido.');
+  const filter = { _id: id, organizationId: session.organization._id };
+  const ticket = await session.db.collection('tickets').findOne(filter);
+  if (!ticket) return fail(res, 404, 'TICKET_NOT_FOUND', 'Chamado não encontrado.');
+
+  if (req.method === 'GET') {
+    const messages = await session.db.collection('ticket_messages').find({ ticketId: id, organizationId: session.organization._id, internal: { $ne: true } }).sort({ createdAt: 1 }).toArray();
+    return ok(res, { ticket: serializeTicket(ticket), messages: messages.map(m => ({ id: String(m._id), authorType: m.authorType, authorName: m.authorName, message: m.message, createdAt: m.createdAt })) });
+  }
+  if (req.method !== 'PATCH') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  if (!assertSameOrigin(req)) return fail(res, 403, '

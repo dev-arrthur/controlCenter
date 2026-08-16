@@ -1,0 +1,47 @@
+name: Apply admin portal update
+
+on:
+  push:
+    branches:
+      - feat/admin-portal-auth-seed
+    paths:
+      - '.github/workflows/apply-admin-portal-update.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/admin-portal-auth-seed
+
+      - name: Assemble portal files
+        shell: bash
+        run: |
+          mkdir -p api workspace/admin/assets/js
+          cat .tmp/admin-js.part* > workspace/admin/assets/js/admin.js
+          cat .tmp/api-portal.part* > api/portal.js
+          rm -rf .tmp
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate project
+        run: npm run check
+
+      - name: Commit validated implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-admin-portal-update.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "feat: criar portal administrativo e simplificar autenticação"
+          git push origin HEAD:feat/admin-portal-auth-seed

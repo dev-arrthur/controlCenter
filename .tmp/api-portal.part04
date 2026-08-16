@@ -1,0 +1,127 @@
+ });
+}
+async function actionAdminLogout(req, res) {
+  if (req.method !== 'POST') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  clearCookie(res, ADMIN_COOKIE);
+  return ok(res);
+}
+async function actionAdminPassword(req, res) {
+  if (req.method !== 'POST') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  if (!assertSameOrigin(req)) return fail(res, 403, 'INVALID_ORIGIN', 'Origem não permitida.');
+  const session = await requireAdmin(req, res, true);
+  if (!session) return;
+  const input = await parseBody(req);
+  const currentPassword = typeof input.currentPassword === 'string' ? input.currentPassword : '';
+  const newPassword = typeof input.newPassword === 'string' ? input.newPassword : '';
+  if (!validNewPassword(newPassword)) return fail(res, 422, 'WEAK_PASSWORD', 'A nova senha deve ter pelo menos 10 caracteres, com letras e números.');
+  if (!(await bcrypt.compare(currentPassword, session.user.passwordHash || ''))) return fail(res, 401, 'INVALID_PASSWORD', 'A senha atual está incorreta.');
+  await session.db.collection('users').updateOne(
+    { _id: session.user._id },
+    { $set: { passwordHash: await bcrypt.hash(newPassword, 12), forcePasswordChange: false, updatedAt: new Date() }, $inc: { sessionVersion: 1 } }
+  );
+  await audit(session.db, { organizationId: session.user.organizationId || null, userId: session.user._id, action: 'auth.admin.password_changed', entityType: 'user', entityId: session.user._id });
+  clearCookie(res, ADMIN_COOKIE);
+  return ok(res, { relogin: true });
+}
+async function actionAdminDashboard(req, res) {
+  if (req.method !== 'GET') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+  const tickets = session.db.collection('tickets');
+  const active = { $in: ['aberto', 'em_atendimento', 'aguardando_cliente'] };
+  const [abertos, emAtendimento, aguardandoCliente, urgentes, clientes, usuarios, recentes] = await Promise.all([
+    tickets.countDocuments({ status: 'aberto' }),
+    tickets.countDocuments({ status: 'em_atendimento' }),
+    tickets.countDocuments({ status: 'aguardando_cliente' }),
+    tickets.countDocuments({ status: active, priority: 'urgente' }),
+    session.db.collection('organizations').countDocuments({ code: { $ne: 'controlcenter-internal' }, active: { $ne: false }, $or: [{ kind: 'client' }, { kind: { $exists: false } }] }),
+    session.db.collection('users').countDocuments({ role: { $in: CLIENT_ROLES }, active: true }),
+    tickets.find({}).sort({ updatedAt: -1 }).limit(8).toArray()
+  ]);
+  const recentTickets = await enrichTickets(session.db, recentes);
+  return ok(res, {
+    stats: {
+      ativos: abertos + emAtendimento + aguardandoCliente,
+      abertos,
+      emAtendimento,
+      aguardandoCliente,
+      urgentes,
+      clientes,
+      usuarios
+    },
+    recentTickets
+  });
+}
+async function actionAdminTickets(req, res) {
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+  if (req.method !== 'GET') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  const status = cleanText(req.query.status || '', 30).toLowerCase();
+  const priority = cleanText(req.query.priority || '', 20).toLowerCase();
+  const organizationId = objectId(req.query.organizationId);
+  const search = cleanText(req.query.search || '', 120);
+  const page = Math.max(1, Math.min(Number(req.query.page || 1), 1000));
+  const limit = 25;
+  const filter = {};
+  if (status && STATUSES.includes(status)) filter.status = status;
+  if (priority && PRIORITIES.includes(priority)) filter.priority = priority;
+  if (organizationId) filter.organizationId = organizationId;
+  if (search) {
+    const regex = escapeRegex(search);
+    filter.$or = [
+      { ticketNumber: { $regex: regex, $options: 'i' } },
+      { title: { $regex: regex, $options: 'i' } },
+      { 'requester.name': { $regex: regex, $options: 'i' } },
+      { 'requester.email': { $regex: regex, $options: 'i' } }
+    ];
+  }
+  const [items, total] = await Promise.all([
+    session.db.collection('tickets').find(filter).sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+    session.db.collection('tickets').countDocuments(filter)
+  ]);
+  return ok(res, { tickets: await enrichTickets(session.db, items), pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+}
+async function actionAdminTicket(req, res) {
+  const session = await requireAdmin(req, res);
+  if (!session) return;
+  const id = objectId(req.query.id);
+  if (!id) return fail(res, 400, 'INVALID_TICKET', 'Chamado inválido.');
+  const ticket = await session.db.collection('tickets').findOne({ _id: id });
+  if (!ticket) return fail(res, 404, 'TICKET_NOT_FOUND', 'Chamado não encontrado.');
+
+  if (req.method === 'GET') {
+    const [messages, org, team, enriched] = await Promise.all([
+      session.db.collection('ticket_messages').find({ ticketId: id }).sort({ createdAt: 1 }).toArray(),
+      session.db.collection('organizations').findOne({ _id: ticket.organizationId }),
+      session.db.collection('users').find({ role: { $in: ADMIN_ROLES }, active: true }).project({ name: 1, email: 1, role: 1 }).sort({ name: 1 }).toArray(),
+      enrichTickets(session.db, [ticket])
+    ]);
+    return ok(res, {
+      ticket: enriched[0],
+      organization: org ? { id: String(org._id), name: org.name, code: org.code, supportTier: org.supportTier || '' } : null,
+      messages: messages.map(m => ({ id: String(m._id), authorType: m.authorType, authorName: m.authorName, message: m.message, internal: m.internal === true, createdAt: m.createdAt })),
+      team: team.map(u => ({ id: String(u._id), name: u.name, email: u.email, role: u.role }))
+    });
+  }
+  if (req.method !== 'PATCH') return fail(res, 405, 'METHOD_NOT_ALLOWED', 'Método não permitido.');
+  if (!assertSameOrigin(req)) return fail(res, 403, 'INVALID_ORIGIN', 'Origem não permitida.');
+  const input = await parseBody(req);
+  const update = { updatedAt: new Date() };
+  if (input.status !== undefined) {
+    const status = cleanText(input.status, 30).toLowerCase();
+    if (!STATUSES.includes(status)) return fail(res, 422, 'INVALID_STATUS', 'Status inválido.');
+    update.status = status;
+    update.resolvedAt = status === 'resolvido' ? new Date() : (['aberto', 'em_atendimento', 'aguardando_cliente'].includes(status) ? null : ticket.resolvedAt || null);
+    update.closedAt = status === 'fechado' ? new Date() : (status !== 'fechado' ? null : ticket.closedAt || null);
+  }
+  if (input.priority !== undefined) {
+    const priority = cleanText(input.priority, 20).toLowerCase();
+    if (!PRIORITIES.includes(priority)) return fail(res, 422, 'INVALID_PRIORITY', 'Prioridade inválida.');
+    update.priority = priority;
+  }
+  if (input.assignedTo !== undefined) {
+    if (!input.assignedTo) {
+      update.assignedTo = null;
+    } else {
+      const assignedId = objectId(input.assignedTo);
+      const as

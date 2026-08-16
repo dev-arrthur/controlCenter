@@ -1,0 +1,166 @@
+'use strict';
+
+const { MongoClient, ObjectId } = require('mongodb');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+const DB_NAME = process.env.MONGODB_DB || 'controlcenter_portal';
+const CLIENT_COOKIE = process.env.SESSION_COOKIE || 'cc_client_session';
+const ADMIN_COOKIE = process.env.ADMIN_SESSION_COOKIE || 'cc_admin_session';
+const SESSION_HOURS = Math.max(1, Math.min(Number(process.env.SESSION_HOURS || 8), 72));
+const STATUSES = ['aberto', 'em_atendimento', 'aguardando_cliente', 'resolvido', 'fechado'];
+const PRIORITIES = ['baixa', 'media', 'alta', 'urgente'];
+const CATEGORIES = ['suporte', 'rede', 'wifi', 'servidor', 'seguranca', 'backup', 'email', 'acesso', 'equipamento', 'outro'];
+const ADMIN_ROLES = ['admin', 'support'];
+const CLIENT_ROLES = ['client', 'client_admin'];
+
+if (!global.__ccPortalMongo) global.__ccPortalMongo = { client: null, promise: null, indexesReady: false };
+
+function send(res, status, payload) {
+  res.status(status);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json(payload);
+}
+function ok(res, data = {}, status = 200) { return send(res, status, { ok: true, ...data }); }
+function fail(res, status, code, message, details) {
+  const payload = { ok: false, error: { code, message } };
+  if (details !== undefined) payload.error.details = details;
+  return send(res, status, payload);
+}
+function cleanText(value, max = 500) { return typeof value === 'string' ? value.replace(/\u0000/g, '').trim().slice(0, max) : ''; }
+function normalizeEmail(value) { return cleanText(value, 180).toLowerCase(); }
+function normalizeCode(value) { return cleanText(value, 80).toLowerCase().replace(/[^a-z0-9_-]/g, ''); }
+function validEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
+function objectId(value) { return ObjectId.isValid(value) ? new ObjectId(value) : null; }
+function escapeRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function requestIp(req) {
+  const value = req.headers['x-forwarded-for'];
+  return typeof value === 'string' && value ? value.split(',')[0].trim() : (req.socket?.remoteAddress || 'unknown');
+}
+function assertSameOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    return !host || new URL(origin).host === host;
+  } catch { return false; }
+}
+async function parseBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') { try { return JSON.parse(req.body || '{}'); } catch { return {}; } }
+  let raw = '';
+  for await (const chunk of req) {
+    raw += chunk;
+    if (raw.length > 128 * 1024) throw new Error('PAYLOAD_TOO_LARGE');
+  }
+  try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+function secret() {
+  const value = process.env.JWT_SECRET;
+  if (!value || value.length < 32) {
+    const error = new Error('JWT_SECRET_NOT_CONFIGURED');
+    error.code = 'JWT_SECRET_NOT_CONFIGURED';
+    throw error;
+  }
+  return value;
+}
+function parseCookies(req) {
+  return (req.headers.cookie || '').split(';').reduce((out, part) => {
+    const i = part.indexOf('=');
+    if (i < 0) return out;
+    const key = part.slice(0, i).trim();
+    if (key) out[key] = decodeURIComponent(part.slice(i + 1).trim());
+    return out;
+  }, {});
+}
+function setCookie(res, name, token) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${name}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_HOURS * 3600}${secure}`);
+}
+function clearCookie(res, name) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+}
+
+async function ensureIndexes(database) {
+  if (global.__ccPortalMongo.indexesReady) return;
+  await Promise.all([
+    database.collection('organizations').createIndex({ code: 1 }, { unique: true }),
+    database.collection('users').createIndex({ organizationId: 1, email: 1 }, { unique: true }),
+    database.collection('users').createIndex({ email: 1, role: 1 }),
+    database.collection('tickets').createIndex({ organizationId: 1, updatedAt: -1 }),
+    database.collection('tickets').createIndex({ organizationId: 1, status: 1, updatedAt: -1 }),
+    database.collection('tickets').createIndex({ status: 1, priority: 1, updatedAt: -1 }),
+    database.collection('tickets').createIndex({ assignedTo: 1, updatedAt: -1 }),
+    database.collection('tickets').createIndex({ ticketNumber: 1 }, { unique: true }),
+    database.collection('ticket_messages').createIndex({ ticketId: 1, createdAt: 1 }),
+    database.collection('audit_logs').createIndex({ organizationId: 1, createdAt: -1 }),
+    database.collection('auth_attempts').createIndex({ updatedAt: 1 }, { expireAfterSeconds: 86400 })
+  ]);
+  global.__ccPortalMongo.indexesReady = true;
+}
+async function db() {
+  if (!process.env.MONGODB_URI) {
+    const error = new Error('MONGODB_URI_NOT_CONFIGURED');
+    error.code = 'MONGODB_URI_NOT_CONFIGURED';
+    throw error;
+  }
+  if (!global.__ccPortalMongo.promise) {
+    global.__ccPortalMongo.client = new MongoClient(process.env.MONGODB_URI, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000
+    });
+    global.__ccPortalMongo.promise = global.__ccPortalMongo.client.connect();
+  }
+  const database = (await global.__ccPortalMongo.promise).db(DB_NAME);
+  await ensureIndexes(database);
+  return database;
+}
+
+function publicClientUser(user, organization) {
+  return {
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    phone: user.phone || '',
+    role: user.role,
+    organization: {
+      id: String(organization._id),
+      name: organization.name,
+      code: organization.code,
+      supportTier: organization.supportTier || ''
+    }
+  };
+}
+function publicAdminUser(user) {
+  return {
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    phone: user.phone || '',
+    role: user.role,
+    forcePasswordChange: user.forcePasswordChange === true,
+    lastLoginAt: user.lastLoginAt || null
+  };
+}
+function clientToken(user) {
+  return jwt.sign(
+    { sub: String(user._id), oid: String(user.organizationId), role: user.role, kind: 'client', sv: Number(user.sessionVersion || 1) },
+    secret(),
+    { expiresIn: `${SESSION_HOURS}h`, issuer: 'controlcenter-portal', audience: 'controlcenter-client' }
+  );
+}
+function adminToken(user) {
+  return jwt.sign(
+    { sub: String(user._id), role: user.role, kind: 'admin', sv: Number(user.sessionVersion || 1) },
+    secret(),
+    { expiresIn: `${SESSION_HOURS}h`, issuer: 'controlcenter-portal', audience: 'controlcenter-admin' }
+  );
+}
+async function authClient(req) {
+  const token = parseCookies(req)[CLIENT_COOKIE];
+  if (!token) return null;
+  le

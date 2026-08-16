@@ -1,0 +1,120 @@
+ontent = 'Senha redefinida com sucesso. Faça login novamente.'; alert.classList.add('show', 'success'); }
+        setTimeout(() => location.replace(LOGIN), 1100);
+      } catch (error) {
+        if (alert) { alert.textContent = error.message; alert.classList.add('show'); }
+        button.disabled = false; button.textContent = 'Redefinir senha';
+      }
+    });
+  }
+
+  function adminTicketRow(ticket) {
+    return `<tr data-ticket-id="${escapeHtml(ticket.id)}">
+      <td><span class="ticket-title">${escapeHtml(ticket.title)}</span><span class="ticket-number">${escapeHtml(ticket.ticketNumber)}</span></td>
+      <td><strong class="table-org">${escapeHtml(ticket.organizationName || 'Empresa')}</strong><span class="table-sub">${escapeHtml(ticket.requester?.name || '')}</span></td>
+      <td>${priorityPill(ticket.priority)}</td>
+      <td>${statusPill(ticket.status)}</td>
+      <td><span>${escapeHtml(ticket.assignedName || 'Não atribuído')}</span></td>
+      <td>${fmtDate(ticket.updatedAt, true)}</td>
+      <td><i class="bi bi-chevron-right"></i></td>
+    </tr>`;
+  }
+  function bindTicketRows() {
+    $$('tr[data-ticket-id]').forEach(row => { row.style.cursor = 'pointer'; row.onclick = () => location.href = `ticketAdmin.html?id=${encodeURIComponent(row.dataset.ticketId)}`; });
+  }
+
+  async function initDashboard() {
+    const data = await CCAdminApi.dashboard();
+    const stats = {
+      activeTickets: data.stats.ativos,
+      openTickets: data.stats.abertos,
+      inProgressTickets: data.stats.emAtendimento,
+      urgentTickets: data.stats.urgentes,
+      clientCount: data.stats.clientes,
+      userCount: data.stats.usuarios
+    };
+    Object.entries(stats).forEach(([id, value]) => { const el = $(`#${id}`); if (el) el.textContent = value; });
+    const tbody = $('#recentTicketsBody');
+    if (!tbody) return;
+    if (!data.recentTickets.length) tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i><h3>Nenhum chamado ainda</h3><p>Os chamados dos clientes aparecerão aqui.</p></div></td></tr>';
+    else { tbody.innerHTML = data.recentTickets.map(adminTicketRow).join(''); bindTicketRows(); }
+  }
+
+  async function initTickets() {
+    let currentPage = 1;
+    const load = async () => {
+      const params = {
+        page: currentPage,
+        search: $('#ticketSearch')?.value || '',
+        status: $('#statusFilter')?.value || '',
+        priority: $('#priorityFilter')?.value || ''
+      };
+      const tbody = $('#ticketsBody');
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:35px;text-align:center;color:#89939b">Carregando chamados...</td></tr>';
+      try {
+        const data = await CCAdminApi.tickets(params);
+        if (!data.tickets.length) tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-ticket-perforated"></i><h3>Nenhum chamado encontrado</h3><p>Ajuste os filtros e tente novamente.</p></div></td></tr>';
+        else { tbody.innerHTML = data.tickets.map(adminTicketRow).join(''); bindTicketRows(); }
+        $('#paginationInfo').textContent = `Página ${data.pagination.page} de ${data.pagination.pages} • ${data.pagination.total} chamado(s)`;
+        $('#prevPage').disabled = data.pagination.page <= 1;
+        $('#nextPage').disabled = data.pagination.page >= data.pagination.pages;
+      } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><h3>Não foi possível carregar</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
+      }
+    };
+    let timer;
+    $('#ticketSearch')?.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { currentPage = 1; load(); }, 300); });
+    $('#statusFilter')?.addEventListener('change', () => { currentPage = 1; load(); });
+    $('#priorityFilter')?.addEventListener('change', () => { currentPage = 1; load(); });
+    $('#prevPage')?.addEventListener('click', () => { currentPage = Math.max(1, currentPage - 1); load(); });
+    $('#nextPage')?.addEventListener('click', () => { currentPage++; load(); });
+    await load();
+  }
+
+  function renderAdminMessages(messages) {
+    const wrap = $('#messages');
+    if (!wrap) return;
+    wrap.innerHTML = messages.map(msg => `<div class="message ${msg.authorType === 'admin' ? 'admin-message' : 'client'} ${msg.internal ? 'internal-message' : ''}">
+      <div class="message-avatar">${escapeHtml(initials(msg.authorName))}</div>
+      <div class="message-bubble">
+        <div class="message-meta"><strong>${escapeHtml(msg.authorName)}</strong><span>${msg.internal ? 'Nota interna • ' : ''}${fmtDate(msg.createdAt, true)}</span></div>
+        <p>${escapeHtml(msg.message)}</p>
+      </div>
+    </div>`).join('');
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  async function initTicket() {
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id) { location.replace('ticketsAdmin.html'); return; }
+    let first = true;
+    const refresh = async () => {
+      const data = await CCAdminApi.ticket(id);
+      const ticket = data.ticket;
+      $('#ticketTitle').textContent = ticket.title;
+      $('#ticketNumber').textContent = ticket.ticketNumber;
+      $('#ticketNumberSide') && ($('#ticketNumberSide').textContent = ticket.ticketNumber);
+      $('#ticketCompany').textContent = data.organization?.name || ticket.organizationName || 'Empresa';
+      $('#ticketRequester').textContent = `${ticket.requester?.name || 'Solicitante'} • ${ticket.requester?.email || ''}`;
+      $('#ticketCreated').textContent = fmtDate(ticket.createdAt, true);
+      $('#ticketUpdated').textContent = fmtDate(ticket.updatedAt, true);
+      $('#ticketCategory').textContent = CATEGORY_LABELS[ticket.category] || ticket.category;
+      $('#ticketStatusBadge').innerHTML = statusPill(ticket.status);
+      $('#ticketPriorityBadge').innerHTML = priorityPill(ticket.priority);
+      renderAdminMessages(data.messages);
+      if (first) {
+        $('#statusControl').innerHTML = Object.entries(STATUS_LABELS).map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+        $('#priorityControl').innerHTML = Object.entries(PRIORITY_LABELS).map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+        $('#assigneeControl').innerHTML = '<option value="">Não atribuído</option>' + data.team.map(user => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`).join('');
+        first = false;
+      }
+      $('#statusControl').value = ticket.status;
+      $('#priorityControl').value = ticket.priority;
+      $('#assigneeControl').value = ticket.assignedTo || '';
+      return ticket;
+    };
+    await refresh();
+
+    $('#saveTicketControls')?.addEventListener('click', async () => {
+      const button = $('#saveTicketControls'); button.disabled = true;
+      try {
+        await CCAdminApi.updateTicket(id, { status: $('#statusControl').value, priority: $('#priorityControl').value, assignedTo: $('#assigneeCont

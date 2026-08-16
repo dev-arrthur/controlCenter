@@ -1,0 +1,78 @@
+rol').value || null });
+        toast('Chamado atualizado.'); await refresh();
+      } catch (error) { toast(error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+    $('#replyForm')?.addEventListener('submit', async event => {
+      event.preventDefault(); const message = $('#replyMessage').value.trim(); if (!message) return;
+      const button = $('#sendReply'); button.disabled = true;
+      try { await CCAdminApi.sendMessage(id, { message, internal:false }); $('#replyMessage').value = ''; toast('Resposta enviada ao cliente.'); await refresh(); }
+      catch (error) { toast(error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+    $('#internalNoteForm')?.addEventListener('submit', async event => {
+      event.preventDefault(); const message = $('#internalNote').value.trim(); if (!message) return;
+      const button = $('#sendInternalNote'); button.disabled = true;
+      try { await CCAdminApi.sendMessage(id, { message, internal:true }); $('#internalNote').value = ''; toast('Nota interna adicionada.'); await refresh(); }
+      catch (error) { toast(error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+  }
+
+  async function initClients() {
+    let currentPage = 1;
+    let selectedClientId = null;
+    const loadClients = async () => {
+      const tbody = $('#clientsBody');
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:35px;text-align:center;color:#89939b">Carregando clientes...</td></tr>';
+      try {
+        const data = await CCAdminApi.clients({ page: currentPage, search: $('#clientSearch')?.value || '' });
+        if (!data.clients.length) tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="bi bi-buildings"></i><h3>Nenhum cliente encontrado</h3><p>Cadastre a primeira empresa pelo formulário ao lado.</p></div></td></tr>';
+        else tbody.innerHTML = data.clients.map(client => `<tr>
+          <td><strong class="table-org">${escapeHtml(client.name)}</strong><span class="table-sub">${escapeHtml(client.code)}</span></td>
+          <td>${escapeHtml(client.supportTier || '—')}</td>
+          <td>${client.activeUsers}/${client.users}</td>
+          <td>${client.activeTickets}</td>
+          <td><span class="admin-state ${client.active ? 'active' : 'inactive'}">${client.active ? 'Ativo' : 'Inativo'}</span></td>
+          <td><div class="row-actions"><button class="icon-action js-manage-client" data-id="${escapeHtml(client.id)}" data-name="${escapeHtml(client.name)}" type="button" title="Gerenciar usuários"><i class="bi bi-people"></i></button><button class="icon-action js-toggle-client" data-id="${escapeHtml(client.id)}" data-active="${client.active}" type="button" title="${client.active ? 'Desativar' : 'Ativar'}"><i class="bi ${client.active ? 'bi-pause-circle' : 'bi-play-circle'}"></i></button></div></td>
+        </tr>`).join('');
+        $('#clientsPaginationInfo').textContent = `Página ${data.pagination.page} de ${data.pagination.pages} • ${data.pagination.total} cliente(s)`;
+        $('#clientsPrevPage').disabled = data.pagination.page <= 1;
+        $('#clientsNextPage').disabled = data.pagination.page >= data.pagination.pages;
+        $$('.js-toggle-client').forEach(button => button.onclick = async () => {
+          try { await CCAdminApi.updateClient(button.dataset.id, { active: button.dataset.active !== 'true' }); toast('Status do cliente atualizado.'); await loadClients(); }
+          catch (error) { toast(error.message, 'error'); }
+        });
+        $$('.js-manage-client').forEach(button => button.onclick = async () => { selectedClientId = button.dataset.id; $('#selectedClientName').textContent = button.dataset.name; $('#userOrganizationId').value = selectedClientId; $('#clientUsersPanel').classList.remove('hidden'); await loadUsers(); });
+      } catch (error) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><h3>Erro ao carregar</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`; }
+    };
+    const loadUsers = async () => {
+      if (!selectedClientId) return;
+      const tbody = $('#clientUsersBody'); tbody.innerHTML = '<tr><td colspan="5" style="padding:25px;text-align:center;color:#89939b">Carregando...</td></tr>';
+      try {
+        const data = await CCAdminApi.users(selectedClientId);
+        tbody.innerHTML = data.users.length ? data.users.map(user => `<tr>
+          <td><strong>${escapeHtml(user.name)}</strong><span class="table-sub">${escapeHtml(user.email)}</span></td>
+          <td>${user.lastLoginAt ? fmtDate(user.lastLoginAt, true) : 'Nunca'}</td>
+          <td>${user.forcePasswordChange ? '<span class="admin-state warning">Troca pendente</span>' : '<span class="admin-state active">Normal</span>'}</td>
+          <td><span class="admin-state ${user.active ? 'active' : 'inactive'}">${user.active ? 'Ativo' : 'Inativo'}</span></td>
+          <td><div class="row-actions"><button class="icon-action js-reset-user" data-id="${escapeHtml(user.id)}" type="button" title="Redefinir senha"><i class="bi bi-key"></i></button><button class="icon-action js-toggle-user" data-id="${escapeHtml(user.id)}" data-active="${user.active}" type="button" title="${user.active ? 'Desativar' : 'Ativar'}"><i class="bi ${user.active ? 'bi-person-dash' : 'bi-person-check'}"></i></button></div></td>
+        </tr>`).join('') : '<tr><td colspan="5"><div class="empty-state"><p>Nenhum usuário cadastrado.</p></div></td></tr>';
+        $$('.js-toggle-user').forEach(button => button.onclick = async () => { try { await CCAdminApi.updateUser(button.dataset.id, { active: button.dataset.active !== 'true' }); toast('Usuário atualizado.'); await loadUsers(); } catch (error) { toast(error.message, 'error'); } });
+        $$('.js-reset-user').forEach(button => button.onclick = async () => {
+          const newPassword = prompt('Digite a nova senha temporária (mínimo 10 caracteres, com letras e números):');
+          if (!newPassword) return;
+          try { await CCAdminApi.updateUser(button.dataset.id, { newPassword }); toast('Senha do usuário redefinida. As sessões anteriores foram invalidadas.'); await loadUsers(); }
+          catch (error) { toast(error.message, 'error'); }
+        });
+      } catch (error) { toast(error.message, 'error'); }
+    };
+
+    let timer;
+    $('#clientSearch')?.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { currentPage = 1; loadClients(); }, 300); });
+    $('#clientsPrevPage')?.addEventListener('click', () => { currentPage = Math.max(1, currentPage - 1); loadClients(); });
+    $('#clientsNextPage')?.addEventListener('click', () => { currentPage++; loadClients(); });
+    $('#createClientForm')?.addEventListener('submit', async event => {
+      event.preventDefault(); const button = $('#createClientButton'); button.disabled = true;
+      try {
+        await CCAdminApi.createClient({ companyName: $('#companyName').value, code: $('#companyCode').value

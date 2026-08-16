@@ -1,0 +1,128 @@
+(function(){
+  'use strict';
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const page = document.body.dataset.page || '';
+  const LOGIN = '/workspace/admin/loginAdmin.html';
+  const DASH = '/workspace/admin/dashboardAdmin.html';
+  const RESET = '/workspace/admin/changePasswordAdmin.html';
+  const STATUS_LABELS = { aberto:'Aberto', em_atendimento:'Em atendimento', aguardando_cliente:'Aguardando cliente', resolvido:'Resolvido', fechado:'Fechado' };
+  const PRIORITY_LABELS = { baixa:'Baixa', media:'Média', alta:'Alta', urgente:'Urgente' };
+  const CATEGORY_LABELS = { suporte:'Suporte', rede:'Rede', wifi:'Wi-Fi', servidor:'Servidor', seguranca:'Segurança', backup:'Backup', email:'E-mail', acesso:'Acesso', equipamento:'Equipamento', outro:'Outro' };
+
+  function escapeHtml(value='') {
+    return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
+  }
+  function initials(name='') { return name.split(/\s+/).filter(Boolean).slice(0,2).map(v => v[0]).join('').toUpperCase() || 'CC'; }
+  function fmtDate(value, withTime = false) {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return new Intl.DateTimeFormat('pt-BR', withTime ? { dateStyle:'short', timeStyle:'short' } : { dateStyle:'short' }).format(parsed);
+  }
+  function statusPill(status) { return `<span class="status-pill status-${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status] || status)}</span>`; }
+  function priorityPill(priority) { return `<span class="priority-pill priority-${escapeHtml(priority)}">${escapeHtml(PRIORITY_LABELS[priority] || priority)}</span>`; }
+  function toast(message, type='success') {
+    let wrap = $('.portal-toast-wrap');
+    if (!wrap) { wrap = document.createElement('div'); wrap.className = 'portal-toast-wrap'; document.body.appendChild(wrap); }
+    const el = document.createElement('div');
+    el.className = `portal-toast ${type}`;
+    el.innerHTML = `<i class="bi ${type === 'error' ? 'bi-exclamation-circle' : 'bi-check-circle'}"></i><span>${escapeHtml(message)}</span>`;
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 4300);
+  }
+  function loading(show) {
+    let el = $('.loading-overlay');
+    if (show && !el) { el = document.createElement('div'); el.className = 'loading-overlay'; el.innerHTML = '<div class="loading-spinner"></div>'; document.body.appendChild(el); }
+    if (!show && el) el.remove();
+  }
+
+  async function currentAdmin() {
+    const data = await CCAdminApi.me();
+    window.CCAdmin = data.user;
+    window.CCMustChangePassword = data.mustChangePassword === true;
+    return data;
+  }
+  function hydrateShell(user) {
+    $$('.js-admin-name').forEach(el => el.textContent = user.name);
+    $$('.js-admin-email').forEach(el => el.textContent = user.email);
+    $$('.js-admin-initials').forEach(el => el.textContent = initials(user.name));
+    $$('.js-admin-role').forEach(el => el.textContent = user.role === 'admin' ? 'Administrador' : 'Suporte');
+    const active = page === 'admin-ticket' ? 'admin-tickets' : page;
+    $$('[data-nav]').forEach(el => el.classList.toggle('active', el.dataset.nav === active));
+    $('#sidebarToggle')?.addEventListener('click', () => $('#portalSidebar')?.classList.toggle('open'));
+    document.addEventListener('click', event => {
+      const sidebar = $('#portalSidebar');
+      if (innerWidth <= 900 && sidebar?.classList.contains('open') && !sidebar.contains(event.target) && !$('#sidebarToggle')?.contains(event.target)) sidebar.classList.remove('open');
+    });
+    $('#logoutButton')?.addEventListener('click', async () => { try { await CCAdminApi.logout(); } catch {} location.replace(LOGIN); });
+  }
+  async function ensureAdmin() {
+    try {
+      const data = await currentAdmin();
+      if (data.mustChangePassword && page !== 'change-password-admin') {
+        location.replace(RESET);
+        throw new Error('PASSWORD_CHANGE_REDIRECT');
+      }
+      hydrateShell(data.user);
+      return data.user;
+    } catch (error) {
+      if (error.status === 401) location.replace(`${LOGIN}?expired=1`);
+      else if (error.status === 428 || error.code === 'PASSWORD_CHANGE_REQUIRED') location.replace(RESET);
+      else if (error.message !== 'PASSWORD_CHANGE_REDIRECT') toast(error.message, 'error');
+      throw error;
+    }
+  }
+
+  async function initLogin() {
+    try {
+      const data = await currentAdmin();
+      location.replace(data.mustChangePassword ? RESET : DASH);
+      return;
+    } catch {}
+    const params = new URLSearchParams(location.search);
+    if (params.get('expired')) {
+      const alert = $('#loginAlert');
+      if (alert) { alert.textContent = 'Sua sessão administrativa expirou. Entre novamente.'; alert.classList.add('show'); }
+    }
+    $('#togglePassword')?.addEventListener('click', () => {
+      const input = $('#password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+      $('#togglePassword i').className = `bi ${input.type === 'password' ? 'bi-eye' : 'bi-eye-slash'}`;
+    });
+    $('#adminLoginForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const alert = $('#loginAlert'); alert?.classList.remove('show');
+      const button = $('#loginSubmit'); button.disabled = true; button.innerHTML = '<span class="spinner-border"></span> Entrando...';
+      try {
+        const data = await CCAdminApi.login({ email: $('#email').value, password: $('#password').value });
+        location.replace(data.mustChangePassword ? RESET : DASH);
+      } catch (error) {
+        if (alert) { alert.textContent = error.message; alert.classList.add('show'); }
+        button.disabled = false; button.innerHTML = 'Entrar no painel <i class="bi bi-arrow-right"></i>';
+      }
+    });
+  }
+
+  async function initPasswordChange() {
+    const data = await currentAdmin().catch(error => {
+      if (error.status === 401) location.replace(LOGIN);
+      throw error;
+    });
+    const user = data.user;
+    $('.reset-admin-name') && ($('.reset-admin-name').textContent = user.name);
+    $('.reset-admin-email') && ($('.reset-admin-email').textContent = user.email);
+    $('#adminPasswordForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const currentPassword = $('#currentPassword').value;
+      const newPassword = $('#newPassword').value;
+      const confirmPassword = $('#confirmPassword').value;
+      const alert = $('#passwordAlert'); alert?.classList.remove('show');
+      if (newPassword !== confirmPassword) {
+        if (alert) { alert.textContent = 'A confirmação da nova senha não confere.'; alert.classList.add('show'); }
+        return;
+      }
+      const button = $('#changePasswordButton'); button.disabled = true; button.textContent = 'Salvando nova senha...';
+      try {
+        await CCAdminApi.changePassword({ currentPassword, newPassword });
+        if (alert) { alert.textC
